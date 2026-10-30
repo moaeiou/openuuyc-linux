@@ -59,11 +59,10 @@ jobs:
       - name: Collect release files
         shell: bash
         run: |
-          set -euo pipefail
           mkdir -p dist
           install -Dm755 target/release/openuuyc dist/openuuyc
           install -Dm755 target/release/openuuyc-vkms dist/openuuyc-vkms
-          cp target/debian/*.deb dist/
+          mv target/debian/*.deb dist/
 
       - name: Upload the release files
         uses: actions/upload-artifact@main
@@ -82,8 +81,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          pacman -Syu --noconfirm --needed \
-            archlinux-keyring base-devel git zstd
+          pacman -Syu --noconfirm --needed archlinux-keyring base-devel git zstd
 
       - name: Checkout packaging files
         uses: actions/checkout@main
@@ -93,6 +91,32 @@ jobs:
         with:
           name: release_dpkg
           path: dist
+
+      - name: Archive (For the other Linux distributions)
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          stage="openuuyc-${version}-x86_64-linux"
+          mkdir -p "$stage"
+          # Artifact downloads do not preserve executable permissions.
+          chmod +x dist/openuuyc dist/openuuyc-vkms
+          # Keep the package/ layout in the release archive.
+          install -Dm755 dist/openuuyc "$stage/openuuyc"
+          install -Dm755 dist/openuuyc-vkms "$stage/openuuyc-vkms"
+          install -Dm755 package/omarchy/install-omarchy.sh "$stage/package/omarchy/install-omarchy.sh"
+          for file in package/linux/openuuyc.desktop \
+            package/linux/60-openuuyc-uinput.rules \
+            package/linux/app-openuuyc.service \
+            package/linux/openuuyc.service \
+            package/linux/openuuyc-vkms.socket \
+            package/linux/openuuyc-vkms.service \
+            package/omarchy/omarchy-menu.jsonc assets/icon-256.png \
+            LICENSE NOTICES.md; do
+            install -Dm644 "$file" "$stage/$file"
+          done
+          tar --zstd -cf "dist/$stage.tar.zst" "$stage"
+          ls -lh "dist/$stage.tar.zst" dist/openuuyc dist/openuuyc-vkms
 
       - name: Build the pacman package
         shell: bash
@@ -129,32 +153,6 @@ jobs:
           mkdir -p dist
           cp /tmp/pacman-package/*.pkg.tar.zst dist/
           pacman -Qip dist/*.pkg.tar.zst
-      
-      - name: Archive (For the other Linux distributions)
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          stage="openuuyc-${version}-x86_64-linux"
-          mkdir -p "$stage"
-          # Artifact downloads do not preserve executable permissions.
-          chmod +x dist/openuuyc dist/openuuyc-vkms
-          # Keep the package/ layout in the release archive.
-          install -Dm755 dist/openuuyc "$stage/openuuyc"
-          install -Dm755 dist/openuuyc-vkms "$stage/openuuyc-vkms"
-          install -Dm755 package/omarchy/install-omarchy.sh "$stage/package/omarchy/install-omarchy.sh"
-          for file in package/linux/openuuyc.desktop \
-            package/linux/60-openuuyc-uinput.rules \
-            package/linux/app-openuuyc.service \
-            package/linux/openuuyc.service \
-            package/linux/openuuyc-vkms.socket \
-            package/linux/openuuyc-vkms.service \
-            package/omarchy/omarchy-menu.jsonc assets/icon-256.png \
-            LICENSE NOTICES.md; do
-            install -Dm644 "$file" "$stage/$file"
-          done
-          tar --zstd -cf "dist/$stage.tar.zst" "$stage"
-          ls -lh "dist/$stage.tar.zst" dist/openuuyc dist/openuuyc-vkms
 
       - name: Release
         uses: softprops/action-gh-release@master
