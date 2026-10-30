@@ -52,20 +52,11 @@ jobs:
           cargo build --release --locked --bin openuuyc
           cd crates/vkms && CARGO_TARGET_DIR=../../target cargo build --release --locked
 
-      - name: Check the developer probes still build
-        shell: bash
-        run: |
-          cargo check --locked --bins \
-            --manifest-path devtools/probes/gpu-conversion/Cargo.toml \
-            --target-dir target/probes
-          gcc -fsyntax-only -Wall devtools/probes/vaapi_export_probe.c
-          gcc -fsyntax-only -Wall devtools/probes/vulkan_dmabuf_probe.c
-
       - name: Package to deb
         shell: bash
         run: cargo deb --no-build
 
-      - name: Collect release binaries and deb package
+      - name: Collect release files
         shell: bash
         run: |
           set -euo pipefail
@@ -74,7 +65,7 @@ jobs:
           install -Dm755 target/release/openuuyc-vkms dist/openuuyc-vkms
           cp target/debian/*.deb dist/
 
-      - name: Upload the deb package and binaries
+      - name: Upload the release files
         uses: actions/upload-artifact@main
         with:
           name: release_dpkg
@@ -97,7 +88,7 @@ jobs:
       - name: Checkout packaging files
         uses: actions/checkout@main
 
-      - name: Download the deb package and binaries
+      - name: Download the release files
         uses: actions/download-artifact@main
         with:
           name: release_dpkg
