@@ -13,9 +13,10 @@ pkgdesc="Third-party UU Remote client (Linux port, X11 and Wayland)"
 arch=('x86_64')
 url="https://github.com/moaeiou/openuuyc-linux"
 license=('custom')
+# 依赖 Secret Service 接口，由 KWallet、gnome-keyring 等提供，沿用用户现有钱包。
 depends=('gcc-libs' 'fuse3' 'libx11' 'libxcb' 'libxrandr' 'libxi' 'libxcursor'
          'libxfixes' 'libxkbcommon' 'libxkbcommon-x11' 'wayland'
-         'vulkan-icd-loader' 'noto-fonts-cjk' 'gnome-keyring')
+         'vulkan-icd-loader' 'noto-fonts-cjk' 'org.freedesktop.secrets')
 optdepends=(
     'sdl2-compat: standard gamepad forwarding and rumble'
     'libva: H.264 hardware decoding'

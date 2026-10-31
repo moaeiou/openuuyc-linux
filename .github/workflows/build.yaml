@@ -144,8 +144,5 @@ jobs:
             # OpenUUYC ${{ needs.dpkg.outputs.tag }}
             ## 📝 Release Notes
             - Fixes and improvements.
-            ## For the ArchLinux users
-            - Install the Arch package with `sudo pacman -U openuuyc-${{ needs.dpkg.outputs.version }}-1-x86_64.pkg.tar.zst`.
-            - Debian/Ubuntu users can install the `.deb`; the standalone `openuuyc` executable is also available.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

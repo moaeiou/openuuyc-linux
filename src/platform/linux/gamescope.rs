@@ -107,14 +107,11 @@ pub(crate) fn fit_control_center(window: &Window) {
     }
 }
 
-/// Gamescope may have no desktop session to activate and unlock a wallet.
-/// Help/version and repeat-instance activation never reach this GUI hook.
-/// Best effort: the keyring itself reports a wallet it cannot use when the
-/// login is read, so a failure here never keeps the program from starting.
+/// 所有桌面会话均自动激活系统钱包，必要时由钱包请求用户解锁。
+/// 帮助、版本查询及重复实例唤起不会进入此 GUI 初始化步骤。
+/// 准备失败只记录警告，后续凭据操作会报告具体错误，不阻止界面启动。
 pub(crate) fn prepare_wallet() {
-    if active()
-        && let Err(error) = pollster::block_on(prepare_wallet_async())
-    {
+    if let Err(error) = pollster::block_on(prepare_wallet_async()) {
         tracing::warn!(error = %format!("{error:#}"), "准备系统钱包失败");
     }
 }
@@ -122,14 +119,15 @@ pub(crate) fn prepare_wallet() {
 async fn activate_wallet(bus: &zbus::Proxy<'_>) -> Result<String> {
     let available: bool = bus.call("NameHasOwner", &(SECRET_SERVICE,)).await?;
     if !available {
-        // Do not import HOME or XDG data paths: the credential daemon must keep
-        // using its host wallet even when this client is running portably.
-        let graphical = graphical_environment(|key| std::env::var(key).ok());
-        bus.call::<_, _, ()>("UpdateActivationEnvironment", &(graphical,))
-            .await?;
-        // Always honor the configured default, even when KWallet is installed.
-        // Only a missing activation entry permits the KDE compatibility alias;
-        // a broken or denied default must not silently select another wallet.
+        // 普通桌面沿用会话总线已有环境；只有 Gamescope 需要补齐图形环境。
+        // 不传入 HOME 或 XDG 数据路径，避免便携模式改变系统钱包的存储位置。
+        if active() {
+            let graphical = graphical_environment(|key| std::env::var(key).ok());
+            bus.call::<_, _, ()>("UpdateActivationEnvironment", &(graphical,))
+                .await?;
+        }
+        // 尊重系统默认提供者；只有未配置标准激活入口时才尝试 KWallet 兼容入口。
+        // 默认提供者启动失败或访问被拒绝时，不擅自切换到另一套钱包。
         if let Err(error) = bus
             .call::<_, _, u32>("StartServiceByName", &(SECRET_SERVICE, 0u32))
             .await
@@ -145,7 +143,7 @@ async fn activate_wallet(bus: &zbus::Proxy<'_>) -> Result<String> {
             if !kwallet_fallback_allowed(error_name, &services) {
                 return Err(error.into());
             }
-            // A provider may have appeared while activation entries were read.
+            // 读取激活入口期间，可能已有其他进程启动了钱包。
             let available: bool = bus.call("NameHasOwner", &(SECRET_SERVICE,)).await?;
             if !available {
                 let _: u32 = bus
@@ -154,8 +152,8 @@ async fn activate_wallet(bus: &zbus::Proxy<'_>) -> Result<String> {
             }
         }
     }
-    // The compatibility alias can exist with Secret Service disabled. Require
-    // the real interface, then pin all operations to this unique bus owner.
+    // 兼容别名存在不代表 Secret Service 已启用；确认实际接口后，
+    // 将后续操作绑定到同一总线连接。
     bus.call("GetNameOwner", &(SECRET_SERVICE,))
         .await
         .context("系统钱包未提供 Secret Service 接口")
@@ -182,7 +180,7 @@ async fn prepare_wallet_async() -> Result<()> {
     .await?;
     let collection: OwnedObjectPath = secrets.call("ReadAlias", &("default",)).await?;
     if collection.as_str() == "/" {
-        // A new account still uses the provider's ordinary first-use flow.
+        // 新账户仍交由钱包提供者执行正常的首次初始化流程。
         return Ok(());
     }
     let properties = zbus::Proxy::new(
@@ -210,9 +208,14 @@ async fn prepare_wallet_async() -> Result<()> {
         "org.freedesktop.Secret.Prompt",
     )
     .await?;
-    // Subscribe before Prompt: an already-unlocked provider may finish at once.
+    // 先订阅再请求提示，避免遗漏钱包立即完成时发出的信号。
     let mut completed = prompt_proxy.receive_signal("Completed").await?;
-    let mut windows = kwallet_windows(&bus, &owner).await;
+    // Steam 窗口关联只用于 Gamescope，不干预普通桌面的钱包窗口。
+    let mut windows = if active() {
+        kwallet_windows(&bus, &owner).await
+    } else {
+        None
+    };
     prompt_proxy.call::<_, _, ()>("Prompt", &("",)).await?;
     let deadline = Instant::now() + Duration::from_secs(180);
     loop {
@@ -226,15 +229,15 @@ async fn prepare_wallet_async() -> Result<()> {
             return Ok(());
         }
         if Instant::now() >= deadline {
-            // Dismiss only this prompt, leaving the shared wallet service alone.
+            // 只关闭本次解锁提示，不停止共享的钱包服务。
             let _ = prompt_proxy.call::<_, _, ()>("Dismiss", &()).await;
             bail!("系统钱包解锁超时");
         }
         if let Some(windows) = &mut windows {
             windows.attach();
         }
-        // This private bootstrap loop runs before the GUI or Tokio workers.
-        // zbus dispatches on its own async-io executor while we wait for a user.
+        // 此初始化循环在 GUI 和 Tokio 工作线程启动前执行。
+        // 等待用户期间，zbus 通过自身的 async-io 执行器分发消息。
         std::thread::sleep(Duration::from_millis(100));
     }
 }
