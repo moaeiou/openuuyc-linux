@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use winit::dpi::PhysicalPosition;
 use winit::window::Window;
-use zbus::zvariant::{OwnedObjectPath, OwnedValue};
+use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 
 const SECRET_SERVICE: &str = "org.freedesktop.secrets";
 const SECRET_PATH: &str = "/org/freedesktop/secrets";
@@ -178,10 +178,24 @@ async fn prepare_wallet_async() -> Result<()> {
         "org.freedesktop.Secret.Service",
     )
     .await?;
-    let collection: OwnedObjectPath = secrets.call("ReadAlias", &("default",)).await?;
+    let mut collection: OwnedObjectPath = secrets.call("ReadAlias", &("default",)).await?;
     if collection.as_str() == "/" {
-        // 新账户仍交由钱包提供者执行正常的首次初始化流程。
-        return Ok(());
+        // keyring 后端不会创建缺失的默认集合，而是直接返回 NoResult。
+        // 通过系统钱包的正常创建流程初始化，密码及确认均由钱包自身处理。
+        let properties = HashMap::from([(
+            "org.freedesktop.Secret.Collection.Label",
+            Value::from("OpenUUYC"),
+        )]);
+        let (created, prompt): (OwnedObjectPath, OwnedObjectPath) = secrets
+            .call("CreateCollection", &(properties, "default"))
+            .await
+            .context("创建默认钱包集合失败")?;
+        complete_wallet_prompt(&connection, &bus, &owner, prompt).await?;
+        collection = secrets.call("ReadAlias", &("default",)).await?;
+        ensure!(
+            collection.as_str() != "/",
+            "系统钱包未建立默认集合（创建结果：{created}），请重试登录"
+        );
     }
     let properties = zbus::Proxy::new(
         &connection,
@@ -201,9 +215,22 @@ async fn prepare_wallet_async() -> Result<()> {
     if prompt.as_str() == "/" {
         return Ok(());
     }
+    complete_wallet_prompt(&connection, &bus, &owner, prompt).await
+}
+
+/// 创建集合和解锁共用钱包的交互流程，不绕过密码或用户取消。
+async fn complete_wallet_prompt(
+    connection: &zbus::Connection,
+    bus: &zbus::Proxy<'_>,
+    owner: &str,
+    prompt: OwnedObjectPath,
+) -> Result<()> {
+    if prompt.as_str() == "/" {
+        return Ok(());
+    }
     let prompt_proxy = zbus::Proxy::new(
-        &connection,
-        owner.as_str(),
+        connection,
+        owner,
         prompt.as_str(),
         "org.freedesktop.Secret.Prompt",
     )
@@ -212,7 +239,7 @@ async fn prepare_wallet_async() -> Result<()> {
     let mut completed = prompt_proxy.receive_signal("Completed").await?;
     // Steam 窗口关联只用于 Gamescope，不干预普通桌面的钱包窗口。
     let mut windows = if active() {
-        kwallet_windows(&bus, &owner).await
+        kwallet_windows(bus, owner).await
     } else {
         None
     };
@@ -220,18 +247,18 @@ async fn prepare_wallet_async() -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(180);
     loop {
         if let Some(message) = completed.next().now_or_never() {
-            let message = message.context("系统钱包在解锁前断开")?;
-            if message.header().sender().map(|name| name.as_str()) != Some(owner.as_str()) {
+            let message = message.context("系统钱包在交互完成前断开")?;
+            if message.header().sender().map(|name| name.as_str()) != Some(owner) {
                 continue;
             }
             let (dismissed, _): (bool, OwnedValue) = message.body().deserialize()?;
-            ensure!(!dismissed, "系统钱包解锁已取消");
+            ensure!(!dismissed, "系统钱包操作已取消");
             return Ok(());
         }
         if Instant::now() >= deadline {
-            // 只关闭本次解锁提示，不停止共享的钱包服务。
+            // 只关闭本次钱包提示，不停止共享的钱包服务。
             let _ = prompt_proxy.call::<_, _, ()>("Dismiss", &()).await;
-            bail!("系统钱包解锁超时");
+            bail!("系统钱包操作超时");
         }
         if let Some(windows) = &mut windows {
             windows.attach();
