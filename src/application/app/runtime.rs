@@ -22,6 +22,18 @@ pub(super) struct GuiWorker {
 }
 
 impl GuiWorker {
+    /// 返回是否无需继续等待后台确认；接收端消失也必须允许界面退出。
+    pub(super) fn prepare_exit(&self, pending: &mut bool) -> bool {
+        if self.commands.is_closed() {
+            *pending = false;
+            return true;
+        }
+        if !*pending {
+            *pending = self.commands.send(GuiCommand::PrepareExit).is_ok();
+        }
+        !*pending
+    }
+
     pub(super) fn spawn() -> Self {
         let (commands, command_receiver) = mpsc::unbounded_channel();
         let (focus, foreground) = watch::channel(false);
@@ -1026,5 +1038,58 @@ pub(super) async fn gui_worker_loop(
 pub(super) async fn stop_active_signal(active_signal: &mut Option<ActivePresence>) {
     if let Some(signal) = active_signal.take() {
         signal.close().await;
+    }
+}
+
+#[cfg(test)]
+mod exit_tests {
+    use super::*;
+
+    fn worker() -> (GuiWorker, mpsc::UnboundedReceiver<GuiCommand>) {
+        let (commands, receiver) = mpsc::unbounded_channel();
+        let (focus, _) = watch::channel(false);
+        let (_, events) = std::sync::mpsc::channel();
+        (
+            GuiWorker {
+                commands,
+                focus,
+                events,
+                thread: None,
+            },
+            receiver,
+        )
+    }
+
+    #[test]
+    fn stopped_worker_does_not_block_exit() {
+        let (worker, receiver) = worker();
+        drop(receiver);
+        let mut pending = false;
+        assert!(worker.prepare_exit(&mut pending));
+        assert!(!pending);
+    }
+
+    #[test]
+    fn live_worker_receives_only_one_exit_request() {
+        let (worker, mut receiver) = worker();
+        let mut pending = false;
+        assert!(!worker.prepare_exit(&mut pending));
+        assert!(pending);
+        assert!(matches!(receiver.try_recv(), Ok(GuiCommand::PrepareExit)));
+        assert!(!worker.prepare_exit(&mut pending));
+        assert!(matches!(
+            receiver.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn worker_stopping_during_handshake_does_not_block_exit() {
+        let (worker, receiver) = worker();
+        let mut pending = false;
+        assert!(!worker.prepare_exit(&mut pending));
+        drop(receiver);
+        assert!(worker.prepare_exit(&mut pending));
+        assert!(!pending);
     }
 }

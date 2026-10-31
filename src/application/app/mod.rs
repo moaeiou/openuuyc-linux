@@ -1179,14 +1179,10 @@ impl DeviceCenterApp {
         false
     }
     fn prepare_exit(&mut self) {
-        if !self.exit_requested || self.exit_pending || self.exit_ready || self.maintenance_busy() {
+        if !self.exit_requested || self.exit_ready || self.maintenance_busy() {
             return;
         }
-        self.exit_pending = self.worker.commands.send(GuiCommand::PrepareExit).is_ok();
-        if !self.exit_pending {
-            self.exit_requested = false;
-            self.status = StatusMessage::error("后台线程已停止，无法确认被控是否退出");
-        }
+        self.exit_ready = self.worker.prepare_exit(&mut self.exit_pending);
     }
     fn has_viewers(&self) -> bool {
         self.viewers.has_viewers()
@@ -1244,6 +1240,9 @@ impl crate::ui::App for DeviceCenterApp {
         self.draw_dialogs(&ctx);
 
         self.prepare_exit();
+        if self.exit_ready {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
         if !self.exit_requested && !self.login_restoring && !self.login_running {
             self.update_dialog(&ctx);
         }
