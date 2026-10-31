@@ -12,8 +12,7 @@ pub(super) struct Settings {
 }
 impl Settings {
     fn path() -> Result<PathBuf> {
-        Ok(crate::platform::paths::require_local_app_data()?
-            .join("OpenUUYC")
+        Ok(crate::platform::paths::require_app_data()?
             .join("updates.json"))
     }
     pub fn load() -> Result<Self> {

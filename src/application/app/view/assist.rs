@@ -58,7 +58,7 @@ impl DeviceCenterApp {
                 RichText::new(if favorites {
                     "收藏设备"
                 } else {
-                    "远程协助"
+                    "开始协助"
                 })
                 .size(theme::TITLE)
                 .strong(),
@@ -333,7 +333,7 @@ impl DeviceCenterApp {
         crate::ui::controls::observe_notice(
             ui.ctx(),
             "assist-connect-error",
-            "远程协助",
+            "开始协助",
             crate::ui::controls::DialogIcon::Warning,
             self.assist
                 .connect_error
@@ -360,7 +360,7 @@ impl DeviceCenterApp {
                 crate::ui::controls::notice(
                     ui.ctx(),
                     "assist-result",
-                    "远程协助",
+                    "开始协助",
                     crate::ui::controls::DialogIcon::Info,
                     std::mem::take(&mut self.assist.message),
                 );

@@ -66,7 +66,7 @@ pre_remove() {
     cat <<'EOF'
 OpenUUYC 已移除。以下用户数据被保留：
 
-    ~/.local/share/OpenUUYC/          日志与屏幕共享授权令牌
+    ~/.local/openuuyc/          日志与屏幕共享授权令牌
     ~/.config/systemd/user/           登录自启（openuuyc.service）
     ~/.config/autostart/openuuyc.desktop  （不接 graphical-session.target 的桌面上的登录自启）
 

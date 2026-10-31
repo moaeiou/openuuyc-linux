@@ -54,7 +54,7 @@
 | 向官方主控发文件（队列浮窗）     | —                                                               | ✅                                                                                                                                  | ❌                                                                          |
 | 独立文件传输                     | ✅                                                              | ✅ 根为 `\`，路径对外用反斜杠                                                                                                       | ✅ 同左                                                                     |
 | 端口转发                         | ✅ TCP / UDP                                                    | ✅ 需开许可                                                                                                                         | ✅ 需开许可                                                                 |
-| 被控终端（UU 手机端的「终端」）  | ❌ 不提供                                                       | ✅ 需开许可，以桌面用户身份运行；「终端会话」页可本机新建、用系统终端接上；本机开的会话另需「允许主控接入本机终端会话」才对主控可见 | ✅ 同左                                                                     |
+| 被控终端（UU 手机端的「终端」）  | ❌ 不提供                                                       | ✅ 需开许可，以桌面用户身份运行；「远程终端」页可本机新建、用系统终端接上；本机开的会话另需「允许主控接入本机终端会话」才对主控可见 | ✅ 同左                                                                     |
 | 批注 / 白板                      | ❌                                                              | ❌ 拒绝请求                                                                                                                         | ❌ 拒绝请求                                                                 |
 | 远程关机 / 重启                  | ✅                                                              | ✅ logind，受 polkit 约束                                                                                                           | ✅ logind，受 polkit 约束                                                   |
 | 远程开机（WoL）                  | ✅                                                              | ⚠️ 网卡需手动 ethtool                                                                                                               | ⚠️ 网卡需手动 ethtool                                                       |
@@ -167,7 +167,22 @@ sudo pacman -S --needed xdg-desktop-portal-gnome   # KDE 为 xdg-desktop-portal-
 # wlroots 系合成器也走门户时（如 OPENUUYC_CAPTURE=portal）：Hyprland 为 xdg-desktop-portal-hyprland，Sway 等为 xdg-desktop-portal-wlr
 ```
 
-经门户采集时，首次被控会弹出一次共享授权，之后记在 `~/.local/share/OpenUUYC/screencast-restore-token`。
+经门户采集时，首次被控会弹出一次共享授权，之后记在 `~/.local/openuuyc/screencast-restore-token`。
+
+## 本地数据与启动检查
+
+用户配置、日志和缓存统一保存在 `~/.local/openuuyc/`。启动时自动合并旧的
+`~/.local/share/OpenUUYC/`、`~/.local/share/openuuyc/`、`~/.local/OpenUUYC/`
+以及自定义 `XDG_DATA_HOME` 下的同名目录；新目录中的同名文件优先，冲突的旧文件保留原位，不覆盖或删除。
+
+本机媒体能力在首次允许静默采集的启动中检查一次，结果保存为 `~/.local/openuuyc/check.toml`，
+其中 `succeeded` 表示是否成功，`checked_at` 记录检查时间，失败时 `error` 保存具体原因。
+旧的 `host-media-check.json` 会自动转换为 TOML，转换成功后清理旧文件，不重复执行检查。
+后续启动直接读取记录，不因重启或桌面会话变化重复预检，也不再显示媒体检查进度。
+记录为失败时只写入日志，不在每次开机时弹窗；真正被控连接时仍会检查当前媒体能力。
+需要门户授权的采集仍等实际连接时才请求授权。正常开机后台启动保持隐藏，包括 Wayland；
+当次检测、显示器探测、登录恢复或后台服务启动失败时仍会弹窗，启动页面会显示原因。
+需要重新执行启动预检时，退出程序并删除 `check.toml` 即可。
 
 ## 硬件编解码
 
@@ -182,7 +197,7 @@ sudo pacman -S --needed xdg-desktop-portal-gnome   # KDE 为 xdg-desktop-portal-
   - 若 `systemctl --user status openuuyc.service` 显示 `inactive (dead)`，日志却提示“已在运行”，说明这次后台启动没有取得实例锁，不能据此判断已有进程是否正常。先运行 `pgrep -a -x openuuyc`、`lslocks` 查看已有进程和锁持有者，再运行 `openuuyc` 尝试打开已有窗口。若要交给 systemd 管理，先从托盘退出已有实例，再执行 `systemctl --user start openuuyc.service`；需要登录自启时另执行 `systemctl --user enable openuuyc.service`。不要删除运行时目录里的 `.lock` 文件：文件存在不表示锁仍被占用，删除一个被持有的锁文件反而可能让两个实例同时运行。
 - **协助邀请链接**：安装包的 `openuuyc.desktop` 登记了 `x-scheme-handler/uuremote`，没有 Windows 那样的接管开关，可用 `xdg-mime default <程序>.desktop x-scheme-handler/uuremote` 改。便携运行时把链接作为唯一参数传给程序。
 - **被控终端**：默认关闭，在被控设置的访问权限里打开，打开时会确认一次；以 root 运行时不提供，本机也不能新建。shell 跑在 pty 上，断线后保留、重连可接回（重开同一会话即接管，旧连接不再收输出），接回时重画当前屏幕，不带回已滚出屏幕的输出；主控开的会话在退出或切换账号、关闭终端开关、禁止被控或在本机断开连接时结束，两端都没有附着 30 分钟后也会结束。设置页显示运行中的会话数，可一键结束全部。
-  - **终端会话页**：侧边栏常驻，列出全部会话，可结束；也能在本机新建会话，或用系统终端接上任一会话（`$TERMINAL` 优先，再找常见的终端模拟器）。命令行是 `openuuyc terminal [编号或名字]`、`--list`、`--new [名字]`，控制中心没在跑时新建和接入会以 `gui --background` 把它拉起来。本机经 `$XDG_RUNTIME_DIR/openuuyc/terminal.sock` 接入，只有同一用户能连。本机与主控同时附着时输入输出同步，终端按两边较小的尺寸显示；关掉本地终端只断开这一端。本机开的会话不会因空闲被结束，shell 退出后从列表消失。
+  - **远程终端页**：侧边栏常驻，列出全部会话，可结束；也能在本机新建会话，或用系统终端接上任一会话（`$TERMINAL` 优先，再找常见的终端模拟器）。命令行是 `openuuyc terminal [编号或名字]`、`--list`、`--new [名字]`，控制中心没在跑时新建和接入会以 `gui --background` 把它拉起来。本机经 `$XDG_RUNTIME_DIR/openuuyc/terminal.sock` 接入，只有同一用户能连。本机与主控同时附着时输入输出同步，终端按两边较小的尺寸显示；关掉本地终端只断开这一端。本机开的会话不会因空闲被结束，shell 退出后从列表消失。
   - **本机会话对主控的可见性**：本机开的会话默认不对主控可见，主控看不到、也接不上。要让主控接入，在「终端」下再打开「允许主控接入本机终端会话」，打开时会再确认一次，关闭终端开关时它一并关闭。主控接入本机会话时访问通知会写明；关掉这一项后主控立即断开这些会话，shell 留给本机。
 - **远程开机**：配置网卡需要 root，程序内不提供，请用 `sudo ethtool -s <网卡> wol g`。远程关机与重启经 systemd-logind，受 polkit 约束。
 - **更新**：「关于」页的更新提醒指向上游的 Windows Release；Linux 版请从本 fork 的 Release 或 deb / AUR 包更新。下面的「命令行更新」只适用于 Windows。

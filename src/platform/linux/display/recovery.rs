@@ -43,13 +43,13 @@ impl Drop for Serial {
     }
 }
 
-/// Where the lock and readiness markers live: per user, cleared at logout.
+/// 锁与就绪标记优先放在注销时清理的用户运行目录，不可用时回退到用户数据目录。
 fn runtime_dir() -> Result<PathBuf> {
-    let base = std::env::var_os("XDG_RUNTIME_DIR")
+    let directory = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
-        .map_or_else(crate::platform::paths::require_local_app_data, Ok)?;
-    let directory = base.join("openuuyc");
+        .map(|base| base.join("openuuyc"))
+        .map_or_else(crate::platform::paths::require_app_data, Ok)?;
     std::fs::create_dir_all(&directory)?;
     Ok(directory)
 }

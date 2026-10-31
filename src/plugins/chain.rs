@@ -440,7 +440,7 @@ impl Controller {
             }
         });
         if self.saved.is_empty() {
-            ui.weak("在控制中心的插件管理中创建并应用节点图。");
+            ui.weak("在控制中心的插件设置中创建并应用节点图。");
         }
     }
     pub fn paint(&mut self, ctx: &egui::Context, width: f32, height: f32, video: [f32; 4]) {

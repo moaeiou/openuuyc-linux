@@ -38,7 +38,7 @@ impl DeviceCenterApp {
         }
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("日志设置")
+                RichText::new("日志管理")
                     .size(crate::ui::theme::TITLE)
                     .strong(),
             );
@@ -89,7 +89,7 @@ impl DeviceCenterApp {
             crate::ui::controls::notice(
                 ui.ctx(),
                 "log-settings-result",
-                "日志设置",
+                "日志管理",
                 if ok {
                     crate::ui::controls::DialogIcon::Ready
                 } else {
@@ -101,7 +101,7 @@ impl DeviceCenterApp {
         crate::ui::controls::observe_notice(
             ui.ctx(),
             "log-settings-error",
-            "日志设置",
+            "日志管理",
             crate::ui::controls::DialogIcon::Error,
             snapshot.error.as_deref(),
         );

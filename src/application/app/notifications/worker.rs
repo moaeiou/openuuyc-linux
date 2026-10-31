@@ -22,8 +22,8 @@ pub(super) struct Worker {
     thread: Option<std::thread::JoinHandle<()>>,
 }
 fn path() -> Result<std::path::PathBuf> {
-    let base = crate::platform::paths::local_app_data().context("无法确定通知设置目录")?;
-    Ok(base.join("OpenUUYC").join("notifications.json"))
+    let base = crate::platform::paths::app_data().context("无法确定通知设置目录")?;
+    Ok(base.join("notifications.json"))
 }
 fn load() -> Result<Mode> {
     match std::fs::read(path()?) {

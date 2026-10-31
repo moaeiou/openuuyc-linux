@@ -432,9 +432,9 @@ impl Store {
         crate::account::api::validate_device_id(device)?;
         ensure!(!account.is_empty(), "无法确认当前账号");
         Ok(Self(
-            crate::platform::paths::local_app_data()
+            crate::platform::paths::app_data()
                 .context("本地配置目录不可用")?
-                .join("OpenUUYC/file-transfer")
+                .join("file-transfer")
                 .join(hex::encode(Sha256::digest(account)))
                 .join(format!("{device}.json")),
         ))

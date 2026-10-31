@@ -460,13 +460,13 @@ fn session_store_lock() -> Result<std::fs::File> {
 }
 
 fn credential_store_lock(filename: &str) -> Result<std::fs::File> {
-    let base = crate::platform::paths::local_app_data()
+    let base = crate::platform::paths::app_data()
         .context("用户数据目录不可用，无法协调登录态存储")?;
 
     let directory = if crate::platform::host_service::vault::applies()? {
         crate::platform::host_service::vault::root()?
     } else {
-        base.join("openuuyc")
+        base
     };
     std::fs::create_dir_all(&directory).context("create session coordination directory")?;
     let mut options = std::fs::OpenOptions::new();

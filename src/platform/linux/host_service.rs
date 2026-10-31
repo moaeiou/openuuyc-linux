@@ -659,11 +659,11 @@ pub(crate) fn reserve_presence(device: &str) -> Result<Option<PresenceReservatio
                 .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'),
         "设备标识无效"
     );
-    let base = std::env::var_os("XDG_RUNTIME_DIR")
+    let directory = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
-        .map_or_else(crate::platform::paths::require_local_app_data, Ok)?;
-    let directory = base.join("openuuyc");
+        .map(|base| base.join("openuuyc"))
+        .map_or_else(crate::platform::paths::require_app_data, Ok)?;
     std::fs::create_dir_all(&directory)?;
     let path = directory.join(format!("presence.{device}.lock"));
     let file = std::fs::OpenOptions::new()

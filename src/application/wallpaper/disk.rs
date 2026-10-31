@@ -1,4 +1,4 @@
-//! Disposable image cache. URLs and account credentials are never persisted.
+//! 可清理的图片缓存，不持久化 URL 或账号凭据。
 use anyhow::{Context, Result, bail};
 use sha2::{Digest, Sha256};
 use std::{
@@ -18,13 +18,13 @@ const MAX_IMAGE_BYTES: u64 = 4 * 1024 * 1024;
 static IO: Mutex<()> = Mutex::new(());
 
 pub(super) fn path(device: &str, url: &str) -> Option<PathBuf> {
-    let root = crate::platform::paths::local_app_data()?;
+    let root = crate::platform::paths::app_data()?;
     let mut hash = Sha256::new();
     hash.update((device.len() as u64).to_le_bytes());
     hash.update(device.as_bytes());
     hash.update(url.as_bytes());
     Some(
-        root.join("OpenUUYC/cache/wallpapers/v1")
+        root.join("cache/wallpapers/v1")
             .join(format!("{}.png", hex::encode(hash.finalize()))),
     )
 }

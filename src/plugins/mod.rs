@@ -88,7 +88,7 @@ pub(crate) fn root() -> Result<PathBuf> {
     if adjacent.is_dir() {
         return Ok(adjacent);
     }
-    Ok(crate::platform::paths::require_local_app_data()?.join("OpenUUYC/plugins"))
+    Ok(crate::platform::paths::require_app_data()?.join("plugins"))
 }
 pub(crate) fn open_folder(path: &Path) -> Result<()> {
     std::fs::create_dir_all(path)?;

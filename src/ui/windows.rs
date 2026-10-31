@@ -114,24 +114,24 @@ struct Runner {
 /// 应用持有的纹理绑在 egui 上下文上，所以窗口可以销毁，这两样不能。Wayland 没有
 /// 「隐藏窗口」，最后一个 `Arc<Window>` 落地就是真正的销毁。
 ///
-/// A hidden X11 or Windows window keeps running its UI pass on the device
-/// center's 250 ms request, only without presenting it. A destroyed window
-/// does the same here, so nothing the application advances inside `ui()`
-/// (worker events, exit handshake, notification cards and their actions,
-/// update checks, dialogs queued for later) freezes on Wayland alone.
+/// 隐藏的 X11 窗口仍每 250 ms 执行界面逻辑，只是不呈现画面。
+/// Wayland 销毁窗口后也保持同样的轮询，避免后台事件、退出握手、通知操作、
+/// 更新检查和待显示对话框因窗口隐藏而停止推进。
 struct Hidden {
     app: AppSession,
     context: egui::Context,
     tray: Option<super::tray::Tray>,
+    wants_tray: bool,
+    next_tray_attempt: Instant,
     /// egui 的纹理和管线都在绘制资源里，丢了就等于所有文字都要重新上载一遍。
     retained: Retained,
     size: Option<PhysicalSize<u32>>,
     /// Wayland 不向客户端提供窗口位置，那里拿不到值。
     position: Option<PhysicalPosition<i32>>,
-    /// The last window's viewport, in points, that window-less passes reuse.
+    /// 无窗口轮询沿用最后一个窗口的视口，单位为逻辑点。
     viewport: egui::ViewportInfo,
     screen: egui::Rect,
-    /// egui time continues from the last windowed pass.
+    /// egui 时间从最后一次有窗口的轮询继续累计。
     time: f64,
     since: Instant,
     next_pass: Instant,
@@ -148,14 +148,15 @@ enum HiddenPass {
 }
 
 impl Hidden {
-    /// Run the application's UI pass without a window when it is due. Its
-    /// drawing is kept for the next window; a request to show the window
-    /// (`Visible`, `Focus`, un-minimize, attention) recreates it.
+    /// 到期后执行无窗口界面轮询，绘制结果留给下一次打开的窗口。
+    /// 显示、聚焦、取消最小化或请求注意等显式命令才会重建窗口。
     fn pass(&mut self) -> HiddenPass {
         let now = Instant::now();
         if now < self.next_pass {
             return HiddenPass::Wait(self.next_pass);
         }
+        // 开机时桌面面板可能尚未出现；无窗口状态也要继续等待托盘就绪。
+        retry_tray(&mut self.tray, self.wants_tray, &mut self.next_tray_attempt);
         let mut input = egui::RawInput {
             screen_rect: Some(self.screen),
             time: Some(self.time + self.since.elapsed().as_secs_f64()),
@@ -170,8 +171,8 @@ impl Hidden {
             app.0.ui(ui);
             super::controls::show_notices(ui.ctx());
         });
-        // Platform output (cursor, IME, clipboard, links) only follows user
-        // input, which a window-less pass never has.
+        sync_tray(self.tray.as_ref(), self.app.0.controlled());
+        // 光标、输入法、剪贴板和链接输出只来自用户输入，无窗口轮询没有这些输入。
         let (drawing, _platform, mut viewports) = split_output(output);
         self.retained.defer_output(drawing);
         let mut delay = HIDDEN_TICK;
@@ -204,6 +205,17 @@ fn wants_window(commands: &[egui::ViewportCommand]) -> bool {
                 | egui::ViewportCommand::RequestUserAttention(_)
         )
     })
+}
+
+/// Wayland 的可见状态可能未知；后台隐藏期间绝不能提交首帧，否则会映射窗口。
+fn should_present(
+    closing: bool,
+    hiding: bool,
+    requested: bool,
+    visible: Option<bool>,
+    minimized: Option<bool>,
+) -> bool {
+    !closing && !hiding && (requested || visible != Some(false)) && minimized != Some(true)
 }
 
 /// Hides its window when dropped. It is [`DesktopWindow`]'s first field, so
@@ -262,11 +274,8 @@ impl Runner {
     }
 
     /// 把主窗口收进托盘：窗口放掉，应用、egui 上下文、托盘与绘制资源留下。托盘再
-    /// 打开时按收起来之前的尺寸重建窗口，并把这些资源接到新窗口上。Only where
-    /// the window cannot be hidden in place; see [`can_hide`].
-    // Windows always hides in place, so its `Retained` is uninhabited and the
-    // compiler rightly sees everything after `Retained::take` as unreachable
-    // there; the destroy-and-recreate path exists for Wayland only.
+    /// 打开时按收起来之前的尺寸重建窗口，并把这些资源接到新窗口上。
+    /// 仅用于不能原地隐藏窗口的 Wayland 后端，见 [`can_hide`]。
 
     fn hide_main(&mut self) {
         let Some(state) = self.state.take() else {
@@ -289,6 +298,8 @@ impl Runner {
             app,
             context,
             tray,
+            wants_tray,
+            next_tray_attempt,
             presenter,
             input,
             mut viewport,
@@ -307,6 +318,8 @@ impl Runner {
             app,
             context,
             tray,
+            wants_tray,
+            next_tray_attempt,
             retained,
             size,
             position,
@@ -474,6 +487,9 @@ impl Runner {
             .unwrap_or(60_000);
         // 主窗口可能一上来就是收进托盘的状态，角标要当场对上。
         sync_tray(tray.as_ref(), app.0.controlled());
+        // Wayland 不实现 set_visible(false)。后台启动必须在首帧前转入无窗口轮询，
+        // 否则 is_visible() 返回 None 会被误当成可见，提交画面后就会弹出主窗口。
+        let show_after_present = restore.is_some() || self.config.viewport.visible.unwrap_or(true);
         self.state = Some(DesktopWindow {
             hide_on_drop: HideOnDrop(window.clone()),
             app,
@@ -482,13 +498,13 @@ impl Runner {
             input,
             viewport,
             close_requested: false,
-            hide_requested: false,
+            hide_requested: !show_after_present && !can_hide(&window),
             tray,
             wants_tray: uses_tray,
             next_tray_attempt,
             exiting: false,
             // 重建出来的窗口总是要显示的。
-            show_after_present: restore.is_some() || self.config.viewport.visible.unwrap_or(true),
+            show_after_present,
             focus_after_present: self.config.viewport.active.unwrap_or(true),
             window_move: Default::default(),
             window_resize: Default::default(),
@@ -630,6 +646,11 @@ impl DesktopWindow {
         let (drawing, platform, mut viewports) = split_output(output);
         self.input.handle_platform_output(&self.window, platform);
         if let Some(root) = viewports.remove(&egui::ViewportId::ROOT) {
+            // 真正的启动错误仍可要求显示；取消后台隐藏并让首帧正常呈现。
+            if wants_window(&root.commands) {
+                self.hide_requested = false;
+                self.show_after_present = true;
+            }
             for command in &root.commands {
                 match command {
                     egui::ViewportCommand::Close => self.close_requested = true,
@@ -701,10 +722,13 @@ impl DesktopWindow {
         if let Some(size) = self.window_resize.requested_render_size.take() {
             self.presenter.resize(size)?;
         }
-        if !self.close_requested
-            && (self.show_after_present || self.window.is_visible() != Some(false))
-            && self.window.is_minimized() != Some(true)
-        {
+        if should_present(
+            self.close_requested,
+            self.hide_requested,
+            self.show_after_present,
+            self.window.is_visible(),
+            self.window.is_minimized(),
+        ) {
             let presented = self.presenter.render(&self.context, drawing, false)?;
             if presented.ready() && self.show_after_present {
                 self.show_after_present = false;
@@ -722,7 +746,10 @@ impl DesktopWindow {
 
 impl ApplicationHandler<Event> for Runner {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if let Err(error) = self.create(event_loop) {
+        // 会话恢复不是用户要求打开窗口；已经隐藏的主窗口继续保持后台状态。
+        if self.hidden.is_none()
+            && let Err(error) = self.create(event_loop)
+        {
             self.fail(event_loop, error);
         }
     }
@@ -1147,6 +1174,19 @@ mod tests {
             .remove(&egui::ViewportId::ROOT)
             .map(|root| root.commands)
             .unwrap_or_default()
+    }
+
+    #[test]
+    fn background_wayland_does_not_present_but_errors_can_show() {
+        // Wayland 返回未知可见状态；即便已请求绘制，后台隐藏仍优先。
+        assert!(!should_present(false, true, false, None, None));
+        assert!(!should_present(false, true, true, None, None));
+        // 显式打开或错误提示取消隐藏后，应正常呈现第一帧。
+        assert!(should_present(false, false, true, None, None));
+        assert!(should_present(false, false, true, Some(false), Some(false)));
+        assert!(!should_present(false, false, false, Some(false), None));
+        assert!(!should_present(true, false, true, None, None));
+        assert!(!should_present(false, false, true, None, Some(true)));
     }
 
     #[test]

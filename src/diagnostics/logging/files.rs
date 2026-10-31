@@ -16,7 +16,7 @@ pub(super) fn directories() -> Result<(PathBuf, PathBuf)> {
         return Ok((base.clone(), base.join("logs")));
     }
     {
-        let base = crate::platform::paths::require_local_app_data()?.join("OpenUUYC");
+        let base = crate::platform::paths::require_app_data()?;
         Ok((base.clone(), base.join("logs")))
     }
 }

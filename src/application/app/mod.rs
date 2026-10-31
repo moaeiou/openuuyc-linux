@@ -48,13 +48,9 @@ pub struct GuiOptions {
 
 pub fn run(options: GuiOptions) -> Result<()> {
     crate::platform::linux::gamescope::prepare_wallet();
-    // Login startup enabled by an earlier version moves to the unit name the
-    // portal recognizes. It runs systemctl, so it does not hold up startup.
+    // 将旧版登录自启迁移到门户识别的服务名；systemctl 在后台执行，不阻塞启动。
 
     std::thread::spawn(crate::platform::host_service::startup::migrate);
-    // The installed Windows service's user-side backend and its migration
-    // recovery; Linux has no installed service.
-
     // 接管过 `uuremote://` 的话，把注册的命令改回当前这份程序（更新或换目录之后
     // 路径会变）。没接管过就什么都不做，不能因为启动一次就去抢别人的协议。
     // Linux 的协议登记在安装包的 .desktop 里，路径不随程序走。

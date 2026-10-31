@@ -1,4 +1,4 @@
-//! Persistent defaults for this user's controller; no account secrets.
+//! 当前用户主控端的持久化默认设置，不包含账号机密。
 use super::ConnectionMediaOptions;
 use anyhow::{Context, Result};
 use std::io::Write;
@@ -11,8 +11,7 @@ pub(crate) fn fullscreen_floating_ball() -> bool {
 }
 
 fn path() -> Result<std::path::PathBuf> {
-    Ok(crate::platform::paths::require_local_app_data()?
-        .join("OpenUUYC")
+    Ok(crate::platform::paths::require_app_data()?
         .join("media-preferences.json"))
 }
 pub fn load() -> Result<ConnectionMediaOptions> {

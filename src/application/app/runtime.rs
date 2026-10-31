@@ -930,6 +930,8 @@ pub(super) async fn gui_worker_loop(
             if media_ready != Some(catalog_generation) {
                 if startup_media.is_none() {
                     let host = active_client.host.clone();
+                    // 有记录时只读取结果，不再显示“检查本机媒体能力”的进度阶段。
+                    let checked = host.startup_media_checked();
                     let cancel = tokio_util::sync::CancellationToken::new();
                     let task_cancel = cancel.clone();
                     startup_media = Some(StartupMedia {
@@ -937,8 +939,11 @@ pub(super) async fn gui_worker_loop(
                         cancel,
                         task: tokio::spawn(async move { host.prepare_startup(task_cancel).await }),
                     });
-                    startup_last = Some((catalog_generation, StartupStage::Media));
-                    let _ = events.send(GuiEvent::Startup(catalog_generation, StartupStage::Media));
+                    if !checked {
+                        startup_last = Some((catalog_generation, StartupStage::Media));
+                        let _ =
+                            events.send(GuiEvent::Startup(catalog_generation, StartupStage::Media));
+                    }
                 }
                 if !startup_media
                     .as_ref()
@@ -952,9 +957,7 @@ pub(super) async fn gui_worker_loop(
                     .await
                     .unwrap_or_else(|error| Err(error.into()))
                 {
-                    let message = format!(
-                        "本机媒体能力检查失败：{error:#}；连接时将重新检查"
-                    );
+                    let message = format!("本机媒体能力检查失败：{error:#}；连接时将重新检查");
                     let _ = events.send(GuiEvent::Warning(message));
                 }
                 media_ready = Some(catalog_generation);

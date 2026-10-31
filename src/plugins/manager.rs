@@ -132,7 +132,7 @@ impl Manager {
     pub fn show(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new("插件管理")
+                egui::RichText::new("插件设置")
                     .size(crate::ui::theme::TITLE)
                     .strong(),
             );
@@ -169,7 +169,7 @@ impl Manager {
             crate::ui::controls::notice(
                 ui.ctx(),
                 "plugin-manager-error",
-                "插件管理",
+                "插件设置",
                 crate::ui::controls::DialogIcon::Error,
                 error,
             );
@@ -178,7 +178,7 @@ impl Manager {
             crate::ui::controls::notice(
                 ui.ctx(),
                 "plugin-manager-notice",
-                "插件管理",
+                "插件设置",
                 crate::ui::controls::DialogIcon::Info,
                 message,
             );

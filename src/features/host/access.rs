@@ -1,117 +1,81 @@
-//! Device access policy, account lifetime and individual connection leases.
+//! 设备访问策略、账号生命周期和单个连接的租约。
 use super::{capture, lock, settings};
 use anyhow::Context as _;
-use sha2::Digest;
 use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
-#[derive(serde::Serialize, serde::Deserialize)]
-
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct StartupMediaCheck {
-    signature: String,
     succeeded: bool,
-}
-
-fn startup_media_signature(screens: &Result<Vec<capture::Screen>, String>) -> String {
-    let screens = screens.as_ref();
-    let environment = [
-        "DISPLAY",
-        "WAYLAND_DISPLAY",
-        "XDG_SESSION_TYPE",
-        "XDG_CURRENT_DESKTOP",
-        "XDG_SESSION_DESKTOP",
-        "OPENUUYC_CAPTURE",
-        "LIBVA_DRIVER_NAME",
-        "LIBVA_DRIVERS_PATH",
-        "MESA_LOADER_DRIVER_OVERRIDE",
-        "LD_LIBRARY_PATH",
-    ]
-    .map(|name| {
-        (
-            name,
-            std::env::var_os(name).map(|value| value.to_string_lossy().into_owned()),
-        )
-    });
-    let mut render_nodes = std::fs::read_dir("/dev/dri")
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            name.starts_with("renderD").then(|| {
-                let device = format!("/sys/class/drm/{name}/device");
-                (
-                    name,
-                    std::fs::read_to_string(format!("{device}/vendor")).ok(),
-                    std::fs::read_to_string(format!("{device}/device")).ok(),
-                    std::fs::read_link(format!("{device}/driver")).ok(),
-                )
-            })
-        })
-        .collect::<Vec<_>>();
-    render_nodes.sort_by(|left, right| left.0.cmp(&right.0));
-    let mut va_drivers = [
-        "/usr/lib/dri",
-        "/usr/lib64/dri",
-        "/usr/lib/x86_64-linux-gnu/dri",
-        "/usr/lib/aarch64-linux-gnu/dri",
-    ]
-    .into_iter()
-    .flat_map(|directory| std::fs::read_dir(directory).into_iter().flatten().flatten())
-    .filter_map(|entry| {
-        let path = entry.path();
-        let name = path.file_name()?.to_str()?;
-        if !name.ends_with("_drv_video.so") {
-            return None;
-        }
-        let metadata = entry.metadata().ok()?;
-        let modified = metadata
-            .modified()
-            .ok()
-            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|elapsed| elapsed.as_secs());
-        Some((
-            path.to_string_lossy().into_owned(),
-            metadata.len(),
-            modified,
-        ))
-    })
-    .collect::<Vec<_>>();
-    va_drivers.sort_by(|left, right| left.0.cmp(&right.0));
-    let environment =
-        serde_json::to_vec(&(screens, environment, render_nodes, va_drivers)).unwrap_or_default();
-    hex::encode(sha2::Sha256::digest(environment))
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    checked_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 fn startup_media_check_path() -> anyhow::Result<std::path::PathBuf> {
-    Ok(crate::platform::paths::require_local_app_data()?.join("OpenUUYC/host-media-check.json"))
+    Ok(crate::platform::paths::require_app_data()?.join("check.toml"))
 }
 
-fn startup_media_check(signature: &str) -> Option<bool> {
-    let check: StartupMediaCheck =
-        serde_json::from_slice(&std::fs::read(startup_media_check_path().ok()?).ok()?).ok()?;
-    (check.signature == signature).then_some(check.succeeded)
-}
-
-fn save_startup_media_check(signature: String, succeeded: bool) {
-    let result = (|| -> anyhow::Result<()> {
-        let path = startup_media_check_path()?;
-        let parent = path.parent().context("本机数据目录没有父目录")?;
-        std::fs::create_dir_all(parent)?;
-        let temporary = path.with_extension("json.tmp");
-        std::fs::write(
-            &temporary,
-            serde_json::to_vec(&StartupMediaCheck {
-                signature,
-                succeeded,
-            })?,
-        )?;
-        std::fs::rename(temporary, path)?;
-        Ok(())
-    })();
-    if let Err(error) = result {
-        tracing::debug!(%error, "could not persist startup media check");
+fn read_startup_media_check(path: &std::path::Path) -> Option<StartupMediaCheck> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => match toml::from_str(&text) {
+            Ok(check) => Some(check),
+            Err(error) => {
+                tracing::warn!(%error, "check.toml 无效，将重新执行媒体检查");
+                None
+            }
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            // 仅在新文件不存在时迁移旧 JSON；旧签名不再使重启或会话变化触发重复检查。
+            let legacy = path.with_file_name("host-media-check.json");
+            let check = serde_json::from_slice(&std::fs::read(&legacy).ok()?).ok()?;
+            match write_startup_media_check(path, &check) {
+                Ok(()) => {
+                    if let Err(error) = std::fs::remove_file(&legacy) {
+                        tracing::warn!(%error, "check.toml 已保存，但旧检查记录未能清理");
+                    }
+                }
+                Err(error) => tracing::warn!(%error, "旧检查记录暂未能迁移到 check.toml"),
+            }
+            Some(check)
+        }
+        Err(error) => {
+            tracing::warn!(%error, "无法读取 check.toml，将重新执行媒体检查");
+            None
+        }
     }
+}
+
+fn startup_media_check() -> Option<StartupMediaCheck> {
+    read_startup_media_check(&startup_media_check_path().ok()?)
+}
+
+fn write_startup_media_check(
+    path: &std::path::Path,
+    check: &StartupMediaCheck,
+) -> anyhow::Result<()> {
+    let parent = path.parent().context("本机数据目录没有父目录")?;
+    std::fs::create_dir_all(parent)?;
+    let temporary = path.with_extension("toml.tmp");
+    let text = format!(
+        "# 首次本机媒体检查结果；删除此文件可在下次启动时重新检查。\n# succeeded 表示检查是否成功；error 保留失败原因。\n{}",
+        toml::to_string_pretty(check)?
+    );
+    std::fs::write(&temporary, text)?;
+    std::fs::rename(temporary, path)?;
+    Ok(())
+}
+
+fn save_startup_media_check(succeeded: bool, error: Option<String>) -> anyhow::Result<()> {
+    let check = StartupMediaCheck {
+        succeeded,
+        checked_at: Some(chrono::Utc::now().to_rfc3339()),
+        error,
+    };
+    startup_media_check_path()
+        .and_then(|path| write_startup_media_check(&path, &check))
+        .context("无法保存 check.toml，下次启动将重试")
 }
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -479,6 +443,10 @@ impl Handle {
         state.status.error = Some(error);
         state.status.message = "后台连接中断".into();
     }
+    pub(crate) fn startup_media_checked(&self) -> bool {
+        startup_media_check().is_some()
+    }
+
     pub(crate) async fn prepare_startup(
         &self,
         cancel: tokio_util::sync::CancellationToken,
@@ -487,29 +455,37 @@ impl Handle {
             return Ok(());
         }
         tokio::task::spawn_blocking(super::displays::recovery::recover_abandoned).await??;
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
         if capture::needs_consent() || capture::startup_requires_portal() {
-            // Opening capture would ask the local user to share the screen
-            // through the ScreenCast portal; login stays quiet until an
-            // incoming session can ask in the user's context.
+            // 打开采集会触发 ScreenCast 门户授权；登录时保持静默，
+            // 等已获授权的连接到来后，再在用户会话中请求共享。
             tracing::info!("host media probe deferred until an authorized incoming session");
             return Ok(());
         }
 
         {
-            let screens = capture::screens().map_err(|error| format!("{error:#}"));
-            let signature = startup_media_signature(&screens);
-            if let Some(previous_success) = startup_media_check(&signature) {
-                tracing::debug!(
-                    previous_success,
-                    "startup media check skipped; environment is unchanged"
-                );
+            // 启动预检只做一次。失败也保留结果，避免每次登录重复探测；
+            // 真正连接时仍通过 prepare_media 按当前设备状态检查，不把记录当作能力凭据。
+            if let Some(check) = startup_media_check() {
+                // 已有记录时只读取结果，不重复探测，也不因旧的失败记录在每次开机时弹窗；
+                // 失败原因写入日志，真正连接时 prepare_media 仍会重新检查当前能力。
+                if check.succeeded {
+                    tracing::debug!("已读取 check.toml，跳过启动预检");
+                } else {
+                    tracing::warn!(
+                        error = check.error.as_deref().unwrap_or("未记录原因"),
+                        "check.toml 记录上次媒体检查失败，跳过启动预检"
+                    );
+                }
                 return Ok(());
             }
-            let screens = match screens {
+            let screens = match capture::screens() {
                 Ok(screens) => screens,
                 Err(error) => {
-                    save_startup_media_check(signature, false);
-                    return Err(anyhow::Error::msg(error));
+                    save_startup_media_check(false, Some(format!("{error:#}")))?;
+                    return Err(error);
                 }
             };
             let Some(screen) = screens
@@ -518,8 +494,9 @@ impl Handle {
                 .or(screens.first())
                 .cloned()
             else {
-                save_startup_media_check(signature, false);
-                return Ok(());
+                let error = anyhow::anyhow!("未找到可用于媒体检查的显示器");
+                save_startup_media_check(false, Some(error.to_string()))?;
+                return Err(error);
             };
             let owner = self.clone();
             let probe_cancel = cancel.clone();
@@ -534,7 +511,10 @@ impl Handle {
             if cancel.is_cancelled() {
                 return Ok(());
             }
-            save_startup_media_check(signature, result.is_ok());
+            save_startup_media_check(
+                result.is_ok(),
+                result.as_ref().err().map(|error| format!("{error:#}")),
+            )?;
             result.map(|_| ())
         }
     }
@@ -1566,5 +1546,61 @@ impl Lease {
             tracing::warn!(track = self.track, %error, "host media operation failed");
             state.status.error = Some(error);
         });
+    }
+}
+
+#[cfg(test)]
+mod startup_check_tests {
+    use super::*;
+
+    #[test]
+    fn persists_toml_success_and_failure_reasons() {
+        let directory =
+            std::env::temp_dir().join(format!("openuuyc-startup-{}", uuid::Uuid::new_v4()));
+        let path = directory.join("check.toml");
+        assert!(read_startup_media_check(&path).is_none());
+        for succeeded in [true, false] {
+            let check = StartupMediaCheck {
+                succeeded,
+                checked_at: Some("2026-10-31T00:00:00Z".into()),
+                error: (!succeeded).then(|| "编码器检查失败：\"设备不可用\"\n请查看驱动".into()),
+            };
+            write_startup_media_check(&path, &check).unwrap();
+            let loaded = read_startup_media_check(&path).unwrap();
+            assert_eq!(loaded.succeeded, succeeded);
+            assert_eq!(loaded.checked_at, check.checked_at);
+            assert_eq!(loaded.error, check.error);
+            assert!(!path.with_extension("toml.tmp").exists());
+            let text = std::fs::read_to_string(&path).unwrap();
+            assert!(text.contains(&format!("succeeded = {succeeded}")));
+        }
+        std::fs::write(&path, "succeeded = true\n").unwrap();
+        assert!(read_startup_media_check(&path).unwrap().succeeded);
+        for invalid in ["", "succeeded = ", "succeeded = \"yes\""] {
+            std::fs::write(&path, invalid).unwrap();
+            assert!(read_startup_media_check(&path).is_none());
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn migrates_legacy_json_without_rechecking_or_overwriting_toml() {
+        let directory =
+            std::env::temp_dir().join(format!("openuuyc-startup-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("check.toml");
+        let legacy = directory.join("host-media-check.json");
+        std::fs::write(&legacy, br#"{"signature":"old-session","succeeded":true}"#).unwrap();
+        assert!(read_startup_media_check(&path).unwrap().succeeded);
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("succeeded = true")
+        );
+        assert!(!legacy.exists());
+        std::fs::write(&legacy, br#"{"succeeded":false}"#).unwrap();
+        assert!(read_startup_media_check(&path).unwrap().succeeded);
+        assert!(legacy.exists());
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

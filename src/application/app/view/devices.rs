@@ -50,9 +50,6 @@ enum Action {
 }
 
 impl DeviceCenterApp {
-    pub(super) fn devices_page(&mut self, ui: &mut egui::Ui) {
-        self.device_list(ui, false);
-    }
     pub(super) fn management_page(&mut self, ui: &mut egui::Ui) {
         self.device_list(ui, true);
     }

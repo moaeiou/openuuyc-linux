@@ -28,9 +28,9 @@ pub(super) struct Store {
 impl Store {
     pub fn new(scope: &str) -> Result<Self> {
         ensure!(!scope.is_empty() && scope.len() <= 1024, "文件会话身份无效");
-        let directory = crate::platform::paths::local_app_data()
+        let directory = crate::platform::paths::app_data()
             .context("用户目录不可用")?
-            .join("OpenUUYC/file-receive")
+            .join("file-receive")
             .join(hex::encode(Sha256::digest(scope)));
         let store = Self {
             directory,

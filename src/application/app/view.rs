@@ -33,9 +33,7 @@ fn singleline_input(value: &mut String) -> egui::TextEdit<'_> {
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum Page {
     #[default]
-    Mine,
     Assist,
-    Favorites,
     Management,
     DeviceDetails,
     Settings,
@@ -49,17 +47,15 @@ enum Page {
 impl Page {
     fn title(self) -> &'static str {
         match self {
-            Self::Mine => "我的设备",
-            Self::Assist => "远程协助",
-            Self::Favorites => "收藏设备",
+            Self::Assist => "开始协助",
             Self::Management => "全部设备",
             Self::DeviceDetails => "设备详情",
             Self::Settings => "连接设置",
-            Self::Diagnostics => "本机诊断",
-            Self::Shortcuts => "快捷键设置",
-            Self::Logs => "日志设置",
-            Self::Plugins => "插件管理",
-            Self::TerminalSessions => "终端会话",
+            Self::Diagnostics => "设备信息",
+            Self::Shortcuts => "快捷键",
+            Self::Logs => "日志管理",
+            Self::Plugins => "插件设置",
+            Self::TerminalSessions => "远程终端",
             Self::About => "关于",
         }
     }
@@ -624,14 +620,11 @@ impl DeviceCenterApp {
             }
             return;
         }
-        // Reconcile navigation before choosing the panel margins. A removed
-        // device must not leave an empty, edge-to-edge detail page behind.
+        // 选择页面边距前先校正导航，避免设备被移除后留下空白的详情页。
         self.reconcile_device_details();
         let previous_page = self.center_ui.page;
         self.draw_navigation(ui);
-        if self.center_ui.page != previous_page
-            && matches!(self.center_ui.page, Page::Assist | Page::Favorites)
-        {
+        if self.center_ui.page != previous_page && self.center_ui.page == Page::Assist {
             self.request_assist_refresh();
         }
         if self.center_ui.page != Page::Shortcuts {
@@ -667,10 +660,8 @@ impl DeviceCenterApp {
                     self.management_page(ui);
                 } else if self.center_ui.page == Page::TerminalSessions {
                     self.terminal_sessions_page(ui);
-                } else if matches!(self.center_ui.page, Page::Assist | Page::Favorites) {
-                    self.assist_page(ui, self.center_ui.page == Page::Favorites);
-                } else {
-                    self.devices_page(ui);
+                } else if self.center_ui.page == Page::Assist {
+                    self.assist_page(ui, false);
                 }
             });
     }
@@ -716,56 +707,10 @@ impl DeviceCenterApp {
                     title_color,
                 );
                 ui.add_space(24.0);
-                let count = self
-                    .devices
-                    .as_ref()
-                    .map(|list| {
-                        list.my_binded_devices
-                            .iter()
-                            .filter(|d| self.show_in_watching_list(d))
-                            .count()
-                    })
-                    .unwrap_or_default();
-                if nav_item(
-                    ui,
-                    Icon::Monitor,
-                    "我的设备",
-                    Some(count),
-                    self.center_ui.page == Page::Mine
-                        || (self.center_ui.page == Page::DeviceDetails
-                            && self.center_ui.detail_parent == Page::Mine),
-                ) {
-                    self.center_ui.page = Page::Mine;
-                }
-                if nav_item(
-                    ui,
-                    Icon::Monitor,
-                    "全部设备",
-                    self.catalog.as_ref().map(|c| c.groups.entries().count()),
-                    self.center_ui.page == Page::Management
-                        || (self.center_ui.page == Page::DeviceDetails
-                            && self.center_ui.detail_parent == Page::Management),
-                ) {
-                    self.center_ui.page = Page::Management;
-                }
-                let terminals = crate::features::host::terminal::running();
-                ui.add_space(14.0);
-                ui.label(RichText::new("本机被控").small().color(MUTED));
-                if nav_item(
-                    ui,
-                    Icon::Terminal,
-                    "终端会话",
-                    (terminals > 0).then_some(terminals),
-                    self.center_ui.page == Page::TerminalSessions,
-                ) {
-                    self.center_ui.page = Page::TerminalSessions;
-                }
-                ui.add_space(14.0);
-                ui.label(RichText::new("远程协助").small().color(MUTED));
                 if nav_item(
                     ui,
                     Icon::Assist,
-                    "开始协助",
+                    Page::Assist.title(),
                     None,
                     self.center_ui.page == Page::Assist,
                 ) {
@@ -774,71 +719,42 @@ impl DeviceCenterApp {
                 }
                 if nav_item(
                     ui,
-                    Icon::Star,
-                    "收藏设备",
-                    self.assist.lists.as_ref().map(|l| l.favorites.len()),
-                    self.center_ui.page == Page::Favorites,
+                    Icon::Monitor,
+                    Page::Management.title(),
+                    self.catalog.as_ref().map(|c| c.groups.entries().count()),
+                    self.center_ui.page == Page::Management
+                        || (self.center_ui.page == Page::DeviceDetails
+                            && self.center_ui.detail_parent == Page::Management),
                 ) {
-                    self.center_ui.page = Page::Favorites;
-                    self.request_assist_refresh();
+                    self.center_ui.page = Page::Management;
+                }
+                let terminals = crate::features::host::terminal::running();
+                if nav_item(
+                    ui,
+                    Icon::Terminal,
+                    Page::TerminalSessions.title(),
+                    (terminals > 0).then_some(terminals),
+                    self.center_ui.page == Page::TerminalSessions,
+                ) {
+                    self.center_ui.page = Page::TerminalSessions;
                 }
                 ui.add_space(14.0);
                 ui.separator();
                 ui.add_space(8.0);
-                if nav_item(
-                    ui,
-                    Icon::Settings,
-                    "连接设置",
-                    None,
-                    self.center_ui.page == Page::Settings,
-                ) {
-                    self.center_ui.page = Page::Settings;
-                }
-                if nav_item(
-                    ui,
-                    Icon::Keyboard,
-                    "快捷键设置",
-                    None,
-                    self.center_ui.page == Page::Shortcuts,
-                ) {
-                    self.center_ui.page = Page::Shortcuts;
-                }
-                if nav_item(
-                    ui,
-                    Icon::Plugins,
-                    "插件管理",
-                    None,
-                    self.center_ui.page == Page::Plugins,
-                ) {
-                    self.center_ui.page = Page::Plugins;
-                }
-                if nav_item(
-                    ui,
-                    Icon::Logs,
-                    "日志设置",
-                    None,
-                    self.center_ui.page == Page::Logs,
-                ) {
-                    self.center_ui.page = Page::Logs;
-                }
-                if nav_item(
-                    ui,
-                    Icon::Diagnostics,
-                    "本机诊断",
-                    None,
-                    self.center_ui.page == Page::Diagnostics,
-                ) {
-                    self.center_ui.page = Page::Diagnostics;
-                }
-                if nav_item(
-                    ui,
-                    Icon::Info,
-                    "关于",
-                    None,
-                    self.center_ui.page == Page::About,
-                ) {
-                    self.center_ui.page = Page::About;
-                    self.center_ui.legal_document = None;
+                for (page, icon) in [
+                    (Page::Settings, Icon::Settings),
+                    (Page::Shortcuts, Icon::Keyboard),
+                    (Page::Logs, Icon::Logs),
+                    (Page::Diagnostics, Icon::Diagnostics),
+                    (Page::Plugins, Icon::Plugins),
+                    (Page::About, Icon::Info),
+                ] {
+                    if nav_item(ui, icon, page.title(), None, self.center_ui.page == page) {
+                        self.center_ui.page = page;
+                        if page == Page::About {
+                            self.center_ui.legal_document = None;
+                        }
+                    }
                 }
                 ui.with_layout(egui::Layout::bottom_up(Align::Min), |ui| {
                     self.draw_account_footer(ui);
@@ -917,149 +833,13 @@ impl DeviceCenterApp {
         let baseline = bounds.top() + 62.0;
         ui.painter()
             .circle_filled(egui::pos2(left + 3.0, baseline), 3.0, color);
-        let presence_rect = ui.painter().text(
+        ui.painter().text(
             egui::pos2(left + 13.0, baseline),
             egui::Align2::LEFT_CENTER,
             presence,
             FontId::proportional(crate::ui::theme::TINY),
             MUTED,
         );
-        self.draw_version(
-            ui,
-            egui::Rect::from_min_max(
-                egui::pos2((presence_rect.right() + 8.0).min(right), baseline - 11.0),
-                egui::pos2(right, baseline + 11.0),
-            ),
-        );
-    }
-
-    fn draw_version(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
-        use super::updates::State;
-        let current = format!("v{}", env!("CARGO_PKG_VERSION"));
-        let (label, color, mut hint, destination) = match &self.updates.state {
-            State::Checking => (
-                "检查中…".into(),
-                MUTED,
-                format!("当前版本 {current}，正在检查更新…"),
-                None,
-            ),
-            State::Current => (
-                current.clone(),
-                MUTED,
-                format!(
-                    "当前版本 {current}，已是最新{}，点击重新检查",
-                    self.updates.release_label()
-                ),
-                None,
-            ),
-            State::Ahead => (
-                current.clone(),
-                MUTED,
-                format!(
-                    "当前版本 {current} 高于 GitHub 最新{}，点击重新检查",
-                    self.updates.release_label()
-                ),
-                None,
-            ),
-            State::NoRelease => (
-                current.clone(),
-                MUTED,
-                format!(
-                    "当前版本 {current}，暂无公开{}，点击重新检查",
-                    self.updates.release_label()
-                ),
-                None,
-            ),
-            State::Failed(error) => (
-                format!("{current} !"),
-                AMBER,
-                format!("当前版本 {current}\n检查更新失败：{error}\n点击重试"),
-                None,
-            ),
-            State::Available {
-                version,
-                url,
-                prerelease,
-                ..
-            } => {
-                let label = format!("↑ v{version}");
-                (
-                    if label.chars().count() <= 10 {
-                        label
-                    } else {
-                        "有新版本".into()
-                    },
-                    BLUE,
-                    format!(
-                        "发现{} v{version}（当前 {current}）\n点击查看更新内容",
-                        if *prerelease {
-                            "测试版"
-                        } else {
-                            "新版本"
-                        }
-                    ),
-                    Some(url.clone()),
-                )
-            }
-        };
-        let checking = matches!(self.updates.state, State::Checking);
-        let wait = self.updates.retry_wait();
-        let enabled = !checking && (destination.is_some() || wait == 0);
-        if !checking && destination.is_none() && wait > 0 {
-            hint.push_str(&format!("\n{wait} 秒后可重新检查"));
-        }
-        let mut job = egui::text::LayoutJob::simple_singleline(
-            label,
-            FontId::proportional(crate::ui::theme::TINY),
-            Color32::PLACEHOLDER,
-        );
-        job.wrap.max_width = rect.width().max(0.0);
-        job.wrap.max_rows = 1;
-        job.wrap.break_anywhere = true;
-        let text = ui.painter().layout_job(job);
-        let text_size = text.size();
-        let hit_rect = egui::Rect::from_min_size(
-            rect.right_center() - vec2(text_size.x, text_size.y * 0.5),
-            text_size,
-        )
-        .expand(2.0)
-        .intersect(rect)
-        .intersect(ui.clip_rect());
-        let response = ui
-            .interact(
-                hit_rect,
-                ui.scope_id().with("check-release"),
-                if enabled {
-                    Sense::click()
-                } else {
-                    Sense::hover()
-                },
-            )
-            .on_hover_text(hint);
-        response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, "检查更新"));
-        let response = if enabled {
-            response.on_hover_cursor(egui::CursorIcon::PointingHand)
-        } else {
-            response
-        };
-        ui.painter()
-            .with_clip_rect(rect.intersect(ui.clip_rect()))
-            .galley(
-                rect.right_center() - vec2(text_size.x, text_size.y * 0.5),
-                text,
-                if enabled && response.hovered() {
-                    BLUE
-                } else {
-                    color
-                },
-            );
-        if response.clicked() {
-            if destination.is_some() {
-                self.updates.dialog_open = true;
-            } else {
-                self.updates.request(ui.ctx());
-            }
-        }
     }
 
     fn alert(&mut self, ui: &mut egui::Ui) {
@@ -1210,7 +990,11 @@ impl DeviceCenterApp {
     }
 
     fn shortcuts_page(&mut self, ui: &mut egui::Ui) {
-        ui.label(RichText::new("快捷键设置").size(theme::TITLE).strong());
+        ui.label(
+            RichText::new(Page::Shortcuts.title())
+                .size(theme::TITLE)
+                .strong(),
+        );
         ui.add_space(18.0);
         crate::ui::controls::page_scroll("center-shortcuts-scroll").show(ui, |ui| {
             self.center_ui.shortcuts.draw(ui);
@@ -1567,6 +1351,11 @@ impl DeviceCenterApp {
                         .max_rect(rect)
                         .layout(egui::Layout::top_down(Align::Min)),
                 );
+                // 启动失败唤起窗口时，直接显示原因，不能只留下检查进度让用户猜测。
+                if self.status.kind.is_alert() {
+                    content.colored_label(AMBER, &self.status.text);
+                    content.add_space(8.0);
+                }
                 let current = self.startup_stage.index();
                 content.horizontal(|ui| {
                     ui.strong(self.startup_stage.title());

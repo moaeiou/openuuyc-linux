@@ -31,7 +31,11 @@ pub(super) struct ViewState {
 
 impl DeviceCenterApp {
     pub(super) fn diagnostics_page(&mut self, ui: &mut egui::Ui) {
-        ui.label(RichText::new("本机诊断").size(theme::TITLE).strong());
+        ui.label(
+            RichText::new(Page::Diagnostics.title())
+                .size(theme::TITLE)
+                .strong(),
+        );
         ui.add_space(8.0);
         self.diagnostic_export(ui);
         ui.add_space(12.0);

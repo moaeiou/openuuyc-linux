@@ -197,7 +197,7 @@ impl DeviceCenterApp {
                                     }
                                     ui.label(
                                         RichText::new(if before.4 {
-                                            "主控能看到并接管你在本机「终端会话」页或命令行里打开的 shell"
+                                            "主控能看到并接管你在本机「远程终端」页或命令行里打开的 shell"
                                         } else {
                                             "先允许终端，才能打开这一项"
                                         })

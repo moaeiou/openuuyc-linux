@@ -1,10 +1,10 @@
-//! Mutable module preferences belong to the user, never the installed DLL.
+//! 可修改的模块偏好属于用户，不写入已安装的插件库目录。
 use super::*;
 
 pub fn path(id: &str) -> Result<PathBuf> {
     ensure!(super::valid_id(id), "插件 ID 无效");
 
-    let base = crate::platform::paths::require_local_app_data()?.join("OpenUUYC");
+    let base = crate::platform::paths::require_app_data()?;
 
     ensure!(base.is_absolute(), "插件配置目录必须为绝对路径");
     Ok(base.join("plugin-settings").join(format!("{id}.json")))

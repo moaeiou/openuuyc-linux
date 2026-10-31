@@ -1,4 +1,4 @@
-//! 终端会话页：列出被控端与本机正在跑的 shell，并接到本机终端里。
+//! 远程终端页：列出被控端与本机正在跑的 shell，并接到本机终端里。
 //!
 //! 手机端 UU 打开「终端」时会话会出现在这里；本机也可以自己新建，不必等
 //! 远程连接。页面不随本地终端关闭而结束会话。
@@ -8,12 +8,10 @@ impl DeviceCenterApp {
     pub(super) fn terminal_sessions_page(&mut self, ui: &mut egui::Ui) {
         use crate::features::host::terminal;
         let sessions = terminal::local_sessions();
-        // Where this machine cannot host a local shell (no local attach on
-        // this platform, root, SYSTEM), the page still lists and ends the
-        // controller's sessions but offers nothing that is bound to fail.
+        // 本机无法托管本地 shell 时（平台不支持本地附着或以 root 身份运行），
+        // 页面仍列出主控会话并允许结束，但不提供无法执行的本地操作。
         let local_refusal = terminal::local_unavailable();
-        // The host's 「允许主控接入本机终端会话」, which decides whether the
-        // sessions opened here are visible to a controller.
+        // 被控端的「允许主控接入本机终端会话」开关决定本页创建的会话是否对主控可见。
         let open_to_controller = self
             .host
             .as_ref()
@@ -21,7 +19,11 @@ impl DeviceCenterApp {
         // 会话可能在另一头被改名、附着、结束，前台命令也在变，页面每秒刷一次。
         ui.ctx().request_repaint_after(Duration::from_secs(1));
         ui.horizontal(|ui| {
-            ui.label(RichText::new("终端会话").size(theme::TITLE).strong());
+            ui.label(
+                RichText::new(Page::TerminalSessions.title())
+                    .size(theme::TITLE)
+                    .strong(),
+            );
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                 if local_refusal.is_none() && ui.add(primary("新建会话")).clicked() {
                     match terminal::create_local(None) {

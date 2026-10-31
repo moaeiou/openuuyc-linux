@@ -69,9 +69,9 @@ pub(super) fn root() -> Result<PathBuf> {
     portable_root()
 }
 fn portable_root() -> Result<PathBuf> {
-    Ok(crate::platform::paths::local_app_data()
+    Ok(crate::platform::paths::app_data()
         .context("本地显示配置目录不可用")?
-        .join("OpenUUYC/displays"))
+        .join("displays"))
 }
 pub(super) fn transfer_preferences(to_service: bool) -> Result<()> {
     let portable = portable_root()?.join("preferences");

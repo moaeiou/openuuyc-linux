@@ -60,7 +60,7 @@ fn on_portal<T: Send>(
 }
 
 fn token_path() -> Result<std::path::PathBuf> {
-    Ok(crate::platform::paths::require_local_app_data()?.join("OpenUUYC/screencast-restore-token"))
+    Ok(crate::platform::paths::require_app_data()?.join("screencast-restore-token"))
 }
 
 /// Whether the user has granted a session that the portal can restore.

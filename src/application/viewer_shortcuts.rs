@@ -251,9 +251,9 @@ pub(crate) fn modifiers(m: winit::keyboard::ModifiersState) -> u8 {
         | (u8::from(m.super_key()) << 3)
 }
 fn path() -> Result<PathBuf> {
-    let base = crate::platform::paths::local_app_data().context("无法确定本地设置目录")?;
+    let base = crate::platform::paths::app_data().context("无法确定本地设置目录")?;
     ensure!(base.is_absolute(), "设置目录必须为绝对路径");
-    Ok(base.join("OpenUUYC").join("shortcuts.json"))
+    Ok(base.join("shortcuts.json"))
 }
 fn read(path: &std::path::Path) -> Result<Option<Vec<u8>>> {
     let file = match std::fs::File::open(path) {

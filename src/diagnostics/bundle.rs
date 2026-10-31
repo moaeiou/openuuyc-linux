@@ -191,8 +191,8 @@ fn export(
     cancelled(cancel)?;
     super::logging::sync_written();
     let mut roots = vec![snapshot.directory.clone()];
-    if let Some(local) = crate::platform::paths::local_app_data() {
-        let path = local.join("OpenUUYC/logs");
+    if let Some(local) = crate::platform::paths::app_data() {
+        let path = local.join("logs");
         if path != snapshot.directory {
             roots.push(path);
         }

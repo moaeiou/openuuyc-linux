@@ -74,7 +74,7 @@ openuuyc_plugin_api::embed_manifest!(include_bytes!("../manifest.json"));
 
 普通字符串、布尔值和数值可直接按 `config` 的值类型生成控件。节点参数保存到节点图中，不写回 DLL。
 
-没有节点的推理服务使用 `capability: "inference"`；其包级参数可在插件管理页配置。Windows 用户设置位于 `%LOCALAPPDATA%/OpenUUYC/plugin-settings/<插件ID>.json`，与 DLL 分开保存。
+没有节点的推理服务使用 `capability: "inference"`；其包级参数可在插件设置页配置。用户设置位于 `~/.local/openuuyc/plugin-settings/<插件ID>.json`，与插件库分开保存。
 
 `dependencies` 填服务插件 ID。包级依赖适用于所有节点，节点级依赖只用于该节点；可选能力应使用节点级依赖。当前服务接口为推理服务，一条依赖计划最多包含一个推理提供者。未使用的节点不会初始化其依赖。
 
