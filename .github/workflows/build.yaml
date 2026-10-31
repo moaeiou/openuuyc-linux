@@ -60,7 +60,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          cargo build --release --locked --bin openuuyc
+          cargo build --release --bin openuuyc
 
       - name: Package to deb
         shell: bash
