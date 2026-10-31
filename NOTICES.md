@@ -63,13 +63,14 @@ sources and attributions must also be preserved. Rust ports, SIMD
 optimizations, parameter mapping, and other covered modifications do not
 become subject to the project's reserved-rights terms instead.
 Reference: FFmpeg 8.0.3, https://ffmpeg.org/releases/ffmpeg-8.0.3.tar.xz
-License texts: src/media/decoder/COPYING.FFmpeg and
-crates/codec/kernels/h264/COPYING.LGPLv2.1.
+License texts: LICENSE (sections for src/media/decoder/COPYING.FFmpeg and
+crates/codec/kernels/h264/COPYING.LGPLv2.1).
 
 Platform adaptation derived from mediaway-decoder 0.1.8:
 MIT OR Apache-2.0.
 Original notice: Copyright (c) 2026 NyxWays.
-License texts: src/media/decoder/LICENSE-MIT and src/media/decoder/LICENSE-APACHE.
+License texts: LICENSE (sections for src/media/decoder/LICENSE-MIT and
+src/media/decoder/LICENSE-APACHE).
 The original crate was removed, but licenses and attributions for existing
 derivative code remain applicable. mediaway-common has also been removed;
 active media types and decoder ownership now belong to OpenUUYC.
@@ -109,7 +110,7 @@ the Rust packages, not the underlying Opus version.
 
 The WebRTC-rs crates in vendor/ retain their respective
 MIT OR Apache-2.0 licenses and attributions. KCP retains
-vendor/kcp/LICENSE. Project adaptations
+LICENSE (section for vendor/kcp/LICENSE). Project adaptations
 to protocol behavior, lifecycle, and presentation do not remove original
 license obligations.
 

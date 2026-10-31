@@ -2,17 +2,19 @@
 
 ![OpenUUYC](assets/banner.png)
 
-这是用 Rust 编写的 UU 远程第三方 Linux 客户端，支持主控、被控和远程协助。本仓库仅维护 Linux 构建，不包含 Windows/macOS 后端、Windows 安装器和内核驱动。
+这是用 Rust 编写的 UU 远程第三方 Linux 客户端，支持主控、被控和远程协助。
 
-Linux 客户端仍保留与官方客户端及 Windows 远端互通所需的协议、文件路径、键码和剪贴板格式；移除本地 Windows 后端不等于移除这些协议能力。
+这是<https://github.com/DoyoDia/openuuyc-linux>的独立分支，只支持Linux。
 
 ## 下载与使用
 
-使用本仓库 Linux CI 的 deb 或压缩包产物，或按下文从源码构建。扫码或短信登录后连接设备；也可在登录页开启“接受远程协助”。需要本地图形会话，不能接管 Linux 登录界面。
+[GitHub Release](https://github.com/moaeiou/openuuyc-linux/releases)
+
+或从下方[构建与安装](#构建与安装)自己编译。
 
 ## Linux 功能矩阵
 
-以下沿用本分支已有的功能记录，实际能力取决于桌面、显卡、驱动、权限和远端。✅ 支持，⚠️ 部分支持或有前提，❌ 不支持，— 该角色不涉及。
+以下沿用本分支已有的功能记录，实际能力取决于桌面、显卡、驱动、权限和远端。
 
 | 功能 | Linux 主控 | Linux 被控（Xorg） | Linux 被控（Wayland） |
 | --- | --- | --- | --- |
@@ -69,6 +71,8 @@ Linux 客户端仍保留与官方客户端及 Windows 远端互通所需的协�
 | 安装服务 / 驱动 | ❌ 用 deb / AUR 包 | ❌ | ❌ |
 | 更新 | ⚠️ 仅提醒，指向上游 Release | ⚠️ 同左 | ⚠️ 同左 |
 
+✅ 支持，⚠️ 部分支持或有前提，❌ 不支持，— 该角色不涉及。
+
 ## 构建与安装
 
 需要 Rust stable（edition 2024）与 C/C++ 工具链。
@@ -111,7 +115,7 @@ cargo build --release
 ./target/release/openuuyc gui
 ```
 
-### 被控端虚拟显示器（可选）
+## 被控端虚拟显示器（可选）
 
 主控可以要求被控端凭空多出一块显示器。写内核的 configfs 只有 root 能做，所以包里另带一个小程序 `openuuyc-vkms` 和一份套接字激活的系统服务：平时不跑，第一次用到时由套接字拉起。条件：
 
@@ -137,7 +141,7 @@ sudo install -Dm644 package/linux/openuuyc-vkms.socket \
 sudo systemctl daemon-reload && sudo systemctl enable --now openuuyc-vkms.socket
 ```
 
-### 被控端输入权限（Wayland 必需）
+## 被控端输入权限（Wayland 必需）
 
 Wayland 会话下键鼠经 `/dev/uinput` 注入。安装包会带上 udev 规则，重载后当前登录用户即可使用：
 
@@ -160,13 +164,13 @@ sudo pacman -S --needed xdg-desktop-portal-gnome   # KDE 为 xdg-desktop-portal-
 
 经门户采集时，首次被控会弹出一次共享授权，之后记在 `~/.local/share/OpenUUYC/screencast-restore-token`。
 
-### 硬件解码 / 编码
+## 硬件编解码
 
 - **解码**：H.264 走 VA-API。AMD 用 `mesa`，Intel 用 `intel-media-driver`，NVIDIA 用 `libva-nvidia-driver`（Ubuntu 为 `nvidia-vaapi-driver`；并设 `NVD_BACKEND=direct`）；libva 2.15 以前认不出 NVIDIA 显卡对应的驱动，程序会自行指定，无需设置 `LIBVA_DRIVER_NAME`。
 - **编码**（被控）：NVIDIA 用 NVENC；AMD 与 Intel 经 VA-API 编码 H.264（Intel 需 `intel-media-driver` 或 `libva-intel-driver`，AMD 用 `mesa`），都不可用时回退软件编码。
 - **老 Intel GPU / 虚拟机**：Haswell/Broadwell 的 Vulkan 驱动未通过一致性认证，程序仍会使用它（设 `WGPU_ALLOW_UNDERLYING_NONCOMPLIANT_ADAPTER=0` 恢复 wgpu 默认的隐藏行为）；驱动无法向 Wayland surface 呈现时，可安装 `vulkan-swrast`（lavapipe）并用 `OPENUUYC_BACKEND=gl` 或 `OPENUUYC_BACKEND=vulkan` 指定界面后端。
 
-### 运行前提与开关
+## 运行前提与开关
 
 - **运行环境**：登录态存在系统密钥环（Secret Service，需要 gnome-keyring、KWallet 等，没有明文回退）。托盘用 StatusNotifierItem，GNOME 需要 AppIndicator 扩展（Ubuntu 默认启用），桌面没有托盘时关闭窗口即退出；面板比程序晚起来时每 2 秒重试，托盘一出现就改回关闭收进托盘。粘贴远端文件要 `fuse3`。Wayland 会话被控也要有 XWayland（显示器列表与输入注入器都先连 X 服务器）；缩放（含分数缩放）的桌面上，门户共享的屏幕按合成器 `xdg-output` 布局里的输出名与所选显示器配对，需要 XWayland 23.1 及以上（输出以连接器命名）且程序能拿到 `WAYLAND_DISPLAY`，配不上时报错，不会采错屏。拖出文件的预览图要 `gio` 与 `rsvg-convert`。
 - **开机自启**：桌面接进 `graphical-session.target` 时是 systemd 用户单元 `app-openuuyc.service`（`journalctl --user -u app-openuuyc` 看日志）。单元名与 `openuuyc.desktop` 对应，门户才认得出这是 OpenUUYC，KDE 记下的屏幕共享授权才能沿用；旧版本启用的 `openuuyc.service` 在程序启动时迁移过去，迁移前的那次登录由它转发。否则写 `~/.config/autostart/openuuyc.desktop`。两者都不处理的合成器（无 uwsm 的 sway、Hyprland 等）请自行启动 `openuuyc gui --background`。再次启动程序会经 `$XDG_RUNTIME_DIR/openuuyc/control.sock` 唤起已运行的控制中心。
@@ -201,21 +205,6 @@ sudo apt install ./target/debian/openuuyc_*.deb
 ```
 
 安装后从应用菜单启动，或运行 `openuuyc`。
-
-## 开发验证
-
-```bash
-cargo check --all-targets --locked
-cargo test --lib --locked
-cargo test --manifest-path crates/vkms/Cargo.toml --locked
-cargo test --manifest-path devtools/posix-pty-check/Cargo.toml --locked
-```
-
-本地套接字、PTY 和硬件相关测试需要相应的系统权限或设备。Linux 播放窗口使用 wgpu；Windows 专用 D3D11 插件示例不在本仓库中，节点图/SDK 数据结构仍保留供管理界面使用。
-
-## 反馈
-
-问题和建议请提交到 [Issues](https://github.com/djkcyl/openuuyc/issues)。报告问题时附上双方版本、操作步骤、大致发生时间及导出的诊断包，分享前检查是否含私人信息。
 
 ## 鸣谢
 
