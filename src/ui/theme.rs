@@ -1,5 +1,7 @@
 //! Shared visual language for every native UI surface.
 //! Layout is page-specific; palette, typography and control density live here.
+#![expect(dead_code, reason = "保留未接入 Linux 播放器的批注及升级界面主题常量")]
+
 use egui::{Color32, FontId, Stroke};
 
 pub const BG: Color32 = Color32::from_rgb(22, 26, 33);

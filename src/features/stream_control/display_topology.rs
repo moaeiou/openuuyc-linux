@@ -250,6 +250,10 @@ pub(super) fn support(state: &StreamControlState) -> DisplayTopologySupport {
 }
 
 impl StreamControlHandle {
+    #[expect(
+        dead_code,
+        reason = "Linux 播放器尚未接入拓扑切换时的输入暂停及首帧确认"
+    )]
     pub(crate) fn display_input_blocked(&self, track: i32, binding: u64) -> bool {
         let state = lock(&self.shared);
         state.topology.status.blocks(binding as u32 as i32)
@@ -262,6 +266,10 @@ impl StreamControlHandle {
             })
     }
 
+    #[expect(
+        dead_code,
+        reason = "Linux 播放器尚未接入拓扑切换时的输入暂停及首帧确认"
+    )]
     pub(crate) fn topology_frame_presented(&self, screen_id: i32, received_at: Instant) {
         let mut state = lock(&self.shared);
         if state.topology.status.pending

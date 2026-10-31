@@ -1,4 +1,9 @@
 //! Supplemental input worker. Physical input keeps the window's ownership.
+#![expect(
+    dead_code,
+    reason = "Linux 播放器尚未接入插件检测控制，保留输入租约实现"
+)]
+
 use super::{
     hotkeys::ControlGate,
     process::{Shared, lock},

@@ -1,3 +1,8 @@
+#![expect(
+    dead_code,
+    reason = "Linux 播放器尚未接入节点图效果链，保留图执行协调器"
+)]
+
 use super::graph::{Compiled, Document};
 use super::process::lock;
 use super::video::{ChainShared, Loader, Tap, VideoNode};

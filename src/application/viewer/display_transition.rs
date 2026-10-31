@@ -1,4 +1,6 @@
 //! Local feedback for a submitted physical resolution change; never sends a command.
+#![expect(dead_code, reason = "Linux 播放器尚未接入此显示切换提示界面")]
+
 use crate::features::stream_control::StreamControlHandle;
 use crate::ui::theme;
 

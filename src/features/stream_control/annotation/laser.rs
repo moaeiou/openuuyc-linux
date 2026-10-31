@@ -1,6 +1,7 @@
 //! A single transient stroke, matching the original single-colour laser path.
 use super::*;
 
+#[expect(dead_code, reason = "保留远端激光笔状态，Linux 尚未接入本地激光笔绘制")]
 const MAX_SAMPLES: usize = 32;
 
 pub(super) struct LaserTrail {
@@ -12,6 +13,7 @@ pub(super) struct LaserTrail {
 }
 
 impl LaserTrail {
+    #[expect(dead_code, reason = "保留远端激光笔状态，Linux 尚未接入本地激光笔绘制")]
     pub(super) fn new(point: Point, style: Style, options: LaserOptions, now: Instant) -> Self {
         Self {
             samples: VecDeque::from([(now, point)]),
@@ -22,6 +24,7 @@ impl LaserTrail {
         }
     }
 
+    #[expect(dead_code, reason = "保留远端激光笔状态，Linux 尚未接入本地激光笔绘制")]
     pub(super) fn move_to(
         &mut self,
         point: Point,

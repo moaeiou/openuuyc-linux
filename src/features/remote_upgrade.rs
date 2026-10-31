@@ -1,5 +1,10 @@
 //! Update notification and reconnect for an authenticated Windows target.
 //! Local OpenUUYC installation shares the official ReportError(-6) lifecycle.
+#![expect(
+    dead_code,
+    reason = "保留远端升级协议和重连逻辑，Linux 尚未接入完整升级弹窗"
+)]
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 

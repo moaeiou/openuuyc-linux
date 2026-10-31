@@ -1067,20 +1067,6 @@ impl PerformanceMonitor {
         *write_lock(&self.inner.decoder) = decoder.into();
     }
 
-    pub(crate) fn pause_presentation(&self) {
-        self.inner
-            .presentation_epoch
-            .fetch_add(1, Ordering::Relaxed);
-        self.inner
-            .presentation_started
-            .store(false, Ordering::Relaxed);
-        self.drain_sample_events();
-        mutex_lock(&self.inner.sample_state)
-            .latency
-            .last_rendered_at = None;
-        mutex_lock(&self.inner.snapshot_cache).take();
-    }
-
     pub(crate) fn set_video_codec(&self, codec: impl Into<String>) {
         *write_lock(&self.inner.video_codec) = codec.into();
     }

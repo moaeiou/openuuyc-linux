@@ -1,3 +1,5 @@
+#![expect(dead_code, reason = "Linux 播放器尚未接入效果链配置热重载")]
+
 use super::{graph::*, *};
 use std::{
     sync::{

@@ -434,7 +434,6 @@ impl Runner {
             {
                 let _ = proxy.send_event(Event::Repaint(Repaint {
                     window: window_id,
-                    generation: 0,
                     pass: info.current_cumulative_pass_nr,
                     when,
                 }));

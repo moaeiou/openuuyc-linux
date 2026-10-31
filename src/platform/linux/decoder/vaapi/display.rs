@@ -38,7 +38,11 @@ pub(super) fn encoder_display(
         static DISPLAYS: RefCell<Vec<(crate::media::encoding::Codec, Rc<Display>)>> = const { RefCell::new(Vec::new()) };
     }
     DISPLAYS.with(|cell| {
-        if let Some((_, display)) = cell.borrow().iter().find(|(supported, _)| *supported == codec) {
+        if let Some((_, display)) = cell
+            .borrow()
+            .iter()
+            .find(|(supported, _)| *supported == codec)
+        {
             return Ok(Rc::clone(display));
         }
         crate::platform::linux::cuda::initialize_before_va();
@@ -167,15 +171,13 @@ pub(super) fn supports(profile: VAProfile::Type, width: u32, height: u32) -> boo
 }
 
 /// The shared display, so the encoder can open its own config on it.
+#[cfg(test)]
 pub(super) fn display_handle() -> Result<Rc<Display>, crate::media::decode_api::DecodeError> {
     display()
 }
 
 /// Whether the driver offers an H.264 encode entrypoint.
-pub(super) fn supports_encode_on(
-    display: &Display,
-    codec: crate::media::encoding::Codec,
-) -> bool {
+pub(super) fn supports_encode_on(display: &Display, codec: crate::media::encoding::Codec) -> bool {
     let profiles: &[VAProfile::Type] = match codec {
         crate::media::encoding::Codec::H264 => &[
             VAProfile::VAProfileH264High,
@@ -185,9 +187,7 @@ pub(super) fn supports_encode_on(
         crate::media::encoding::Codec::H265 => &[VAProfile::VAProfileHEVCMain],
         crate::media::encoding::Codec::Av1 => &[VAProfile::VAProfileAV1Profile0],
     };
-    profiles
-    .iter()
-    .any(|profile| {
+    profiles.iter().any(|profile| {
         display
             .query_config_entrypoints(*profile)
             .is_ok_and(|entrypoints| entrypoints.contains(&VAEntrypoint::VAEntrypointEncSlice))

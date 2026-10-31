@@ -361,6 +361,7 @@ impl StreamControlHandle {
             .contains_key(&screen_id)
     }
 
+    #[expect(dead_code, reason = "Linux 播放器尚未接入显示切换过程提示")]
     pub(crate) fn pending_display_resolution(&self, screen_id: i32) -> Option<RemoteDisplayMode> {
         let state = lock(&self.shared);
         state.display_changes.pending.get(&screen_id)?.target_mode

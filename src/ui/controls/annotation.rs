@@ -1,3 +1,5 @@
+#![expect(dead_code, reason = "批注图标仍供界面使用，Linux 尚未接入完整批注控件")]
+
 use super::*;
 use egui::{Rect, Response, Sense, Ui, pos2};
 

@@ -115,7 +115,6 @@ pub(crate) struct ConnectingWindowsRunner {
     last_frame: Option<Instant>,
     ui_frame_interval: Duration,
     proxy: EventLoopProxy<UiEvent>,
-    generation: u64,
     /// The audio-only view, shown in place of the connection progress.
     audio: Option<super::AudioView>,
     /// Window geometry to restore when an audio-only session gets video.
@@ -380,7 +379,6 @@ impl ConnectingWindowsRunner {
             ui_frame_interval: Duration::from_secs_f64(1.0 / 60.0),
             proxy,
             embedded,
-            generation: 1,
             audio: None,
             audio_restore_geometry: None,
             screens: None,
@@ -437,8 +435,7 @@ impl ConnectingWindowsRunner {
         );
         crate::ui::branding::set_taskbar_icon(&window);
         configure_dwm_window(&window);
-        let (shell, interval) =
-            Self::build_shell(event_loop, &window, &self.proxy, self.generation)?;
+        let (shell, interval) = Self::build_shell(event_loop, &window, &self.proxy)?;
         self.ui_frame_interval = interval;
         tracing::debug!(
             interval_ms = self.ui_frame_interval.as_secs_f64() * 1000.0,
@@ -465,7 +462,6 @@ impl ConnectingWindowsRunner {
         event_loop: &ActiveEventLoop,
         window: &Arc<Window>,
         proxy: &EventLoopProxy<UiEvent>,
-        generation: u64,
     ) -> Result<(Shell, Duration)> {
         let context = egui::Context::default();
         context.set_embed_viewports(true);
@@ -479,7 +475,6 @@ impl ConnectingWindowsRunner {
             {
                 let _ = proxy.send_event(UiEvent::Repaint(UiRepaintEvent {
                     window: window_id,
-                    generation,
                     pass: info.current_cumulative_pass_nr,
                     when,
                 }));
@@ -604,7 +599,6 @@ impl ConnectingWindowsRunner {
                     self.close_detached_all();
                     self.screens = None;
                     self.alias = alias.clone();
-                    self.generation += 1;
                     self.audio = None;
                     if let Some(window) = &self.window
                         && !window.is_resizable()
@@ -845,8 +839,7 @@ impl ConnectingWindowsRunner {
                 &monitors,
             ));
         }
-        let (shell, interval) =
-            Self::build_shell(event_loop, &window, &self.proxy, self.generation)?;
+        let (shell, interval) = Self::build_shell(event_loop, &window, &self.proxy)?;
 
         let (progress, progress_rx) = std_mpsc::channel();
         let _ = progress.send(ConnectionProgress::working(10, "正在打开显示器", label));
@@ -856,7 +849,6 @@ impl ConnectingWindowsRunner {
         let repaint = move || {
             let _ = proxy.send_event(UiEvent::Repaint(UiRepaintEvent {
                 window: repaint_window,
-                generation: 0,
                 pass: 0,
                 when: Instant::now(),
             }));
@@ -2196,7 +2188,6 @@ impl Player {
         move || {
             let _ = proxy.send_event(UiEvent::Repaint(UiRepaintEvent {
                 window,
-                generation: 0,
                 pass: 0,
                 when: Instant::now(),
             }));
@@ -2297,7 +2288,6 @@ impl Player {
         });
         let _ = self.proxy.send_event(UiEvent::Repaint(UiRepaintEvent {
             window: window.id(),
-            generation: 0,
             pass: 0,
             when: Instant::now(),
         }));
@@ -3872,7 +3862,6 @@ fn request_detach(
     });
     let _ = proxy.send_event(UiEvent::Repaint(UiRepaintEvent {
         window: window.id(),
-        generation: 0,
         pass: 0,
         when: Instant::now(),
     }));
@@ -3977,7 +3966,6 @@ impl FrameWakeBridge {
                     }
                     let _ = proxy.send_event(UiEvent::Repaint(UiRepaintEvent {
                         window,
-                        generation: 0,
                         pass: 0,
                         when: Instant::now(),
                     }));

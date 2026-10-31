@@ -67,3 +67,76 @@ impl Geometry {
             .ok_or_else(|| anyhow::anyhow!("输入目标屏幕已失效"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn screen(id: i32) -> Screen {
+        Screen {
+            id,
+            left: -1920,
+            top: 0,
+            width: 1920,
+            height: 1080,
+            logical: None,
+        }
+    }
+
+    #[test]
+    fn accepts_empty_and_valid_desktop_geometry() {
+        assert!(Geometry::default().validate().is_ok());
+        assert!(
+            Geometry {
+                current: 1,
+                screens: vec![screen(1)]
+            }
+            .validate()
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_ids_and_too_many_screens() {
+        assert!(
+            Geometry {
+                current: 1,
+                screens: vec![screen(1), screen(1)]
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            Geometry {
+                current: 0,
+                screens: (0..33).map(screen).collect()
+            }
+            .validate()
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_dimensions_and_coordinate_overflow() {
+        let mut invalid = screen(1);
+        invalid.width = 0;
+        assert!(
+            Geometry {
+                current: 1,
+                screens: vec![invalid]
+            }
+            .validate()
+            .is_err()
+        );
+        let mut invalid = screen(1);
+        invalid.left = i32::MAX;
+        assert!(
+            Geometry {
+                current: 1,
+                screens: vec![invalid]
+            }
+            .validate()
+            .is_err()
+        );
+    }
+}

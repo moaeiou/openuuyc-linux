@@ -53,6 +53,7 @@ impl Metrics {
 }
 
 impl StreamControlHandle {
+    #[expect(dead_code, reason = "Linux 播放器尚未接入批注白板设置界面")]
     pub(crate) fn annotation_board_color(&self, screen: i32) -> Option<[u8; 3]> {
         lock(&self.shared)
             .annotation
@@ -64,6 +65,7 @@ impl StreamControlHandle {
             })
     }
 
+    #[expect(dead_code, reason = "Linux 播放器尚未接入批注白板设置界面")]
     pub(crate) fn annotation_board(
         &self,
         owner: u64,

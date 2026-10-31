@@ -109,6 +109,7 @@ pub(crate) enum Reply {
     ApiError { code: i32, message: String },
 }
 impl Reply {
+    #[expect(dead_code, reason = "保留账号托管回复协议，Linux 尚无账号托管系统服务")]
     pub(crate) fn from_error(error: anyhow::Error) -> Self {
         match error.downcast::<crate::account::api::ApiFailure>() {
             Ok(error) => Self::ApiError {
@@ -118,6 +119,7 @@ impl Reply {
             Err(error) => Self::Error(format!("{error:#}")),
         }
     }
+    #[expect(dead_code, reason = "保留账号托管回复协议，Linux 尚无账号托管系统服务")]
     pub fn checked(self) -> Result<Self> {
         match self {
             Self::Error(e) => anyhow::bail!(e),

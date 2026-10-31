@@ -77,6 +77,7 @@ fn paint_dialog_icon(ui: &mut egui::Ui, rect: Rect, icon: DialogIcon) {
     }
 }
 
+#[expect(dead_code, reason = "保留远端升级提示使用的对话框图标包装")]
 pub(super) fn dialog_icon(ui: &mut egui::Ui, icon: DialogIcon, size: f32) {
     let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
     paint_dialog_icon(ui, rect, icon);
@@ -122,7 +123,11 @@ pub(crate) fn dialog_header(
         TEXT,
     );
     let close = if closable {
-        let response = ui.interact(close_rect, ui.scope_id().with("dialog-close"), Sense::click());
+        let response = ui.interact(
+            close_rect,
+            ui.scope_id().with("dialog-close"),
+            Sense::click(),
+        );
         if response.hovered() {
             ui.painter()
                 .rect_filled(close_rect, theme::CONTROL_RADIUS, HOVER);

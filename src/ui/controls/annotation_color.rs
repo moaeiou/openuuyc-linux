@@ -1,4 +1,6 @@
 //! Compact colour editor for annotation; no generic numeric-mode or eyedropper UI.
+#![expect(dead_code, reason = "Linux 播放器尚未接入批注颜色编辑器")]
+
 use crate::ui::theme;
 use egui::ecolor::HsvaGamma;
 use egui::{Color32, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};

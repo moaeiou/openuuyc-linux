@@ -1,8 +1,8 @@
-## Keep checkout, editor and formatter line endings consistent on every platform.
+## 在各平台上保持检出文件、编辑器和格式化工具的换行符一致。
 * text=auto eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
-# Catalog signatures cover exact file bytes, including INF line endings.
+# 目录签名覆盖文件的精确字节，包括 INF 文件的换行符。
 /assets/drivers/** binary !eol
 /drivers/**/*.inf -text !eol whitespace=cr-at-eol

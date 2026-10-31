@@ -1,3 +1,8 @@
+#![expect(
+    dead_code,
+    reason = "保留插件视频宿主入口，Linux 播放器尚未接入效果链加载端"
+)]
+
 use super::process::lock;
 use super::*;
 

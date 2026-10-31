@@ -1,4 +1,9 @@
 //! Decoder diagnostic report types; interactive probing is not implemented on Linux.
+#![expect(
+    dead_code,
+    reason = "保留诊断界面使用的报告协议，Linux 尚未实现交互式解码矩阵检查"
+)]
+
 use crate::media::{LocalDisplayInfo, VideoCodec};
 
 use anyhow::Result;

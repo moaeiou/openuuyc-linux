@@ -1,4 +1,9 @@
 //! Shared annotation editor. Protocol adapters submit commands and complete effects.
+#![expect(
+    dead_code,
+    reason = "保留批注协议和状态处理，Linux 尚未接入完整批注输入界面"
+)]
+
 use super::*;
 use board::{Board, BoardEdit};
 use clicks::ClickPulse;

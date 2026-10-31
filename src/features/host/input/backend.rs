@@ -61,6 +61,11 @@ impl Backend {
         geometry: Geometry,
         permitted: impl Fn() -> bool,
     ) -> Result<()> {
+        // 整批校验通过后再注入，避免无效事件导致前半批已经执行。
+        geometry.validate()?;
+        for event in &events {
+            event.validate()?;
+        }
         match self {
             Self::Local(e) => {
                 e.check()?;
@@ -88,6 +93,7 @@ impl Backend {
         }
     }
     pub fn synchronize(&mut self, geometry: Geometry) -> Result<()> {
+        geometry.validate()?;
         match self {
             Self::Local(e) => {
                 e.check()?;

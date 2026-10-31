@@ -1,6 +1,6 @@
 [package]
 name = "openuuyc"
-version = "1.0.2.beta-7"
+version = "1.0.3"
 edition = "2024"
 description = "Third-party Rust client for UU Remote protocol interoperability"
 license-file = "LICENSE"
@@ -12,7 +12,7 @@ autobins = false
 name = "openuuyc"
 path = "src/main.rs"
 
-# `cargo deb` (Linux only): the .deb the Linux workflow builds.
+# `cargo deb`（仅 Linux）：由 Linux 工作流构建 deb 安装包。
 [package.metadata.deb]
 name = "openuuyc"
 maintainer = "DoyoDia <79502694+DoyoDia@users.noreply.github.com>"
@@ -24,15 +24,14 @@ view and control remote devices or accept remote control of this desktop \
 (Xorg session)."""
 section = "net"
 priority = "optional"
-# `$auto` covers what the binary links; the windowing, graphics and audio
-# libraries below are loaded at run time and so are named by hand. FUSE
-# serves pasted and dropped remote files; the UI needs a CJK font.
+# `$auto` 覆盖二进制直接链接的依赖；下列窗口、图形和音频库在运行时加载，需手动列出。
+# FUSE 用于粘贴和拖放远端文件；界面需要中日韩字体。
 depends = """$auto, fuse3, libx11-6, libx11-xcb1, libxcursor1, libxrandr2, libxi6, \
 libxfixes3, libxkbcommon0, libxkbcommon-x11-0, libwayland-client0, \
 libvulkan1 | libegl1, \
 fonts-noto-cjk | fonts-wqy-microhei | fonts-arphic-uming"""
-# gio (libglib2.0-bin) and rsvg-convert (librsvg2-bin) draw the host's drag
-# preview images; without them a drag goes out with no image.
+# gio（libglib2.0-bin）和 rsvg-convert（librsvg2-bin）用于绘制被控端的拖放预览；
+# 缺少这些工具时，拖出文件没有预览图。
 recommends = "libpulse0, libpipewire-0.3-0, gnome-keyring | kwalletmanager, libglib2.0-bin, librsvg2-bin, libsdl2-2.0-0"
 suggests = "ethtool"
 assets = [
@@ -47,11 +46,8 @@ assets = [
     ["NOTICES.md", "usr/share/doc/openuuyc/", "644"],
     ["LICENSE", "usr/share/doc/openuuyc/licenses/", "644"],
 ]
-# 只为 openuuyc-vkms 的两个单元生成维护者脚本（package/linux 里没有自己写的脚本）：
-# 卸载时停掉套接字与服务、daemon-reload，清除时清掉 enable 留下的链接；升级时只
-# try-restart 已经在跑的。enable/start 都关着——装包不会替用户把一个 root 服务开起来，
-# 要用虚拟屏的人自己 `systemctl enable --now openuuyc-vkms.socket`；以前 enable 过的，
-# 升级后保持 enable。
+# 自动生成 VKMS 单元的卸载/清除及升级维护逻辑；不直接启动特权服务。
+# postinst 只自动启用并启动 socket，由首次连接按需拉起 `openuuyc vkms`。
 maintainer-scripts = "package/linux"
 systemd-units = { unit-name = "openuuyc-vkms", enable = false, start = false }
 
@@ -71,7 +67,7 @@ egui = { version = "0.37.0", default-features = false, features = ["bytemuck"] }
 flate2 = "1.1.10"
 futures-util = "0.3.34"
 goog_cc = { path = "vendor/goog_cc" }
-# NVENC hardware encoding for the host role (driver library loaded at run time).
+# 被控端使用 NVENC 硬件编码，驱动库在运行时加载。
 openuuyc-nvenc-sys = { path = "vendor/nvenc-sys" }
 hmac = "0.13.0"
 hyper = { version = "1.12.0", default-features = false }
@@ -112,10 +108,9 @@ winit = { version = "0.30.13", default-features = false, features = ["rwh_06"] }
 zip = { version = "9.1.3", default-features = false, features = ["zstd"] }
 regex = "1.13.1"
 
-# The host terminal keeps each session's screen as a terminal model rather
-# than a byte log, so a reattach replays what was on screen instead of
-# re-feeding raw output that may be cut mid-sequence. This is the upstream
-# crate the reference server's `vt100-psmux` fork is based on.
+# 被控终端按终端模型保存各会话的屏幕，而不是保存字节日志；重新接入时重放屏幕状态，
+# 避免重新输入可能在转义序列中间截断的原始输出。
+# 参考服务端的 `vt100-psmux` 分支以此上游库为基础。
 vt100 = "0.18.1"
 
 [build-dependencies]
@@ -125,23 +120,22 @@ flate2 = "1.1.10"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 glow = "0.18.0"
-# Local display geometry for the viewer, on X11 and Wayland alike.
+# 获取观看端的本地显示器几何信息，同时适用于 X11 和 Wayland。
 display-info = "0.5.10"
 # 被控端加虚拟屏要写 configfs，只有 root 能写，中间隔一个专用的辅助程序
 # （crates/vkms）。这里用的是它的客户端部分。
 openuuyc-vkms = { path = "crates/vkms" }
 cros-libva = { path = "vendor/cros-libva" }
-# The H.264 syntax and its error kinds for the VA-API slice parameters; the
-# software session itself goes through openuuyc-codec like on Windows.
+# 为 VA-API 切片参数提供 H.264 语法和错误类型；
+# 软件解码会话本身仍通过 openuuyc-codec 处理，与原有实现一致。
 openuuyc-h264 = { path = "crates/codec/kernels/h264" }
 egui-wgpu = { version = "0.37.0", default-features = false }
 wgpu = { version = "30.0.1", default-features = false, features = ["vulkan", "gles", "wgsl"] }
 egui-winit = { version = "0.37.0", default-features = false, features = ["clipboard", "links", "x11", "wayland"] }
 winit = { version = "0.30.13", default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-dlopen"] }
 arboard = { version = "3.7.0", default-features = false, features = ["image-data", "wayland-data-control"] }
-# Reading the clipboard's MIME types costs one Wayland round trip, where
-# `arboard`'s getters each open a connection and pull the whole payload. The
-# poll below checks the types first and only reads contents when they change.
+# 查询剪贴板的 MIME 类型只需一次 Wayland 往返；`arboard` 的每个读取接口都会
+# 新建连接并拉取完整数据。因此轮询先检查类型，仅在类型变化时读取内容。
 wl-clipboard-rs = { version = "0.9.5", default-features = false }
 # Wayland 文本输入：zwp_virtual_keyboard 允许自带 keymap，能输入键位表里没有的字符
 # （中文等）。XTest 只能影响 XWayland 客户端，uinput 又无法携带 keymap。
@@ -152,31 +146,29 @@ wayland-protocols-misc = { version = "0.3.12", default-features = false, feature
 # 快捷键（两者在 unstable 后面）；再次启动时用 xdg_activation_v1 凭启动令牌把
 # 已在运行的控制中心提到前台（staging）。
 wayland-protocols = { version = "0.32.13", default-features = false, features = ["client", "staging", "unstable"] }
-# wlr-screencopy, the compositor's own copy protocol: niri, wlroots and
-# everything built on them serve it, and unlike the portal it never asks the
-# local user for consent. The same crate also gives the layer shell, which the
-# Wayland drag-out catcher puts its transparent surface on.
+# wlr-screencopy 是合成器直接提供的复制协议，niri、wlroots 及其衍生实现支持它；
+# 与门户不同，该协议不会请求本地用户确认。
+# 同一库也提供图层外壳，Wayland 拖出捕获器借此放置透明表面。
 wayland-protocols-wlr = { version = "0.3.12", default-features = false, features = ["client"] }
 libc = "0.2.191"
 fuser = { version = "0.18.0", default-features = false }
 x11rb = { version = "0.14.0", features = ["dpms", "randr", "shm", "xfixes", "xtest"] }
-# Notification-area icon (StatusNotifierItem), the counterpart of the Windows tray.
-# zbus must stay on async-io: its tokio feature is global, and makes the
-# blocking Secret Service calls of the keyring panic inside our runtime.
+# 通知区域图标（StatusNotifierItem），用于桌面托盘。
+# zbus 必须使用 async-io：tokio 特性会全局生效，导致密钥环的阻塞式 Secret Service
+# 调用在本程序的运行时内触发恐慌。
 ksni = { version = "0.3.7", default-features = false, features = ["blocking", "async-io"] }
-# Desktop notifications (org.freedesktop.Notifications), the counterpart of
-# Windows toasts; the same async-io zbus as above.
-# zbus 6 removed the blocking API used by the desktop integration.
+# 桌面通知（org.freedesktop.Notifications）；与上面一样使用 async-io 版本的 zbus。
+# zbus 6 移除了桌面集成所需的阻塞接口。
 zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
-# Host capture through the XDG ScreenCast portal (Wayland, and X11 on request).
+# 通过 XDG ScreenCast 门户采集被控端画面，适用于 Wayland，也可按需用于 X11。
 ashpd = { version = "0.13.13", default-features = false, features = ["async-io", "screencast"] }
 pollster = "1.0.1"
-# Playback and microphone through the sound server's own protocol (PulseAudio,
-# or PipeWire's pulse service) on one connection, as Sunshine does; ALSA's
-# pulse plugin opens a new server connection for every device probe.
-# cpal::default_host() picks it when the server is there, ALSA otherwise.
+# 播放和麦克风通过声音服务原生协议复用一条连接（PulseAudio 或 PipeWire 的 pulse
+# 服务），与 Sunshine 相同；ALSA 的 pulse 插件每次探测设备都会新建服务端连接。
+# 声音服务存在时 cpal::default_host() 优先选用它，否则使用 ALSA。
 cpal = { version = "0.18.2", features = ["pulseaudio"] }
 
+# 以下为带项目适配的补丁版本，不是原样复制；来源与替换条件见 vendor/README.md。
 [patch.crates-io]
 dtls = { path = "vendor/dtls" }
 interceptor = { path = "vendor/interceptor" }
@@ -188,29 +180,29 @@ webrtc-srtp = { path = "vendor/webrtc-srtp" }
 webrtc-util = { path = "vendor/webrtc-util" }
 
 [profile.release]
-# Keep playback dependencies, including decoder and SIMD kernels, at their original
-# speed settings. Cross-crate LTO changed hot-code layout in decoder comparisons.
+# 保留播放依赖（包括解码器和 SIMD 内核）原有的性能优化设置。
+# 解码器对比中，跨库 LTO 会改变热点代码布局。
 opt-level = 3
 lto = false
-# One unit avoids repeated async state machines and their unwind metadata.
+# 只使用一个代码生成单元，避免重复生成异步状态机和栈展开元数据。
 codegen-units = 1
 strip = "debuginfo"
-# Decoder workers rely on unwinding to contain failures and release resources.
+# 解码工作线程依赖栈展开隔离故障并释放资源。
 panic = "unwind"
 
 [profile.release.package.openuuyc]
-# Optimize application glue for size without changing decoder/DSP dependencies.
+# 应用衔接代码优先优化体积，不改动解码器和数字信号处理依赖的优化设置。
 opt-level = "s"
 
-# Preserve the validated code generation of the video/SIMD kernels.
+# 保留视频和 SIMD 内核已经验证的代码生成设置。
 [profile.release.package.openuuyc-h264]
 codegen-units = 16
 
 [profile.release.package.yuv]
 codegen-units = 16
 
-# Startup, HTTP management and certificate parsing are outside the media path.
-# Keep the real-time transport, crypto, rendering and codecs at level 3.
+# 启动、HTTP 管理和证书解析不在媒体处理路径上，可优先优化体积。
+# 实时传输、加密、渲染和编解码仍保持 3 级优化。
 [profile.release.package.reqwest]
 opt-level = "s"
 

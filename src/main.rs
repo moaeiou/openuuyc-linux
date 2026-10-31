@@ -259,8 +259,8 @@ fn parse_cli() -> std::result::Result<Cli, clap::Error> {
             .to_ascii_lowercase()
             .starts_with("uuremote:")
     });
-    // An OS protocol activation is a single argument, never a second command.
-    // Clap diagnostics must not echo an invite or its verification code.
+    // 系统协议激活只能携带一个参数，不能附带第二条命令。
+    // Clap 诊断不得回显邀请链接及其中的验证码。
     if has_link && args.len() != 2 {
         return Err(clap::Error::raw(
             clap::error::ErrorKind::InvalidValue,

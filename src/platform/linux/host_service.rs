@@ -1,24 +1,20 @@
-//! The unattended host service, as far as Linux has one: a per-user systemd
-//! unit that follows the graphical session.
+//! Linux 被控端的登录自启：跟随图形会话的每用户 systemd 单元。
 //!
-//! Windows installs a system service that keeps the account online and owns
-//! controlled sessions without a signed-in desktop, with its credentials in a
-//! machine vault. Linux has no equivalent and cannot get one cheaply: capture,
-//! clipboard and audio all come from the compositor session, so a host with
-//! nobody signed in has no picture to send. What Linux does have is
-//! [`startup`]: a systemd user unit, `WantedBy=graphical-session.target`, that
-//! runs the control center with `--background` the way Sunshine runs (or, on
-//! desktops that never reach that target, an XDG autostart entry), so the
-//! desktop client still owns its own account and presence, and every answer
-//! below is still the portable mode's. A machine-wide service would only be
-//! worth it together with a capture path that does not need the session (KMS),
-//! or a virtual display, and would replace these answers.
+//! 原有 Windows 实现可通过系统服务在无人登录时保持账号在线、持有被控会话，
+//! 并将凭据存入机器级保管库。本 Linux 实现尚无对应的账号托管服务：画面采集、
+//! 剪贴板和音频均依赖合成器会话，没有登录桌面时也就没有可发送的画面。
+//! 这里的 [`startup`] 使用 `WantedBy=graphical-session.target` 的用户级单元，
+//! 以 `--background` 运行控制中心，方式类似 Sunshine；不接入该目标的桌面则使用
+//! XDG 自启动条目。因此桌面客户端仍自行管理账号和在线状态，下列接口也仍按
+//! 便携模式回答。若未来实现系统级账号托管，还需配合不依赖桌面会话的采集路径
+//! （例如 KMS）或虚拟显示器，并相应修改这些接口。
+//! 现有 VKMS 系统服务只负责虚拟输出，不承担账号托管。
 use anyhow::{Context, Result, bail};
 use std::path::PathBuf;
 
 const NO_SERVICE: &str = "Linux 尚未提供后台被控服务";
 
-/// Whether an install, update or uninstall is replacing the service now.
+/// 安装、更新或卸载操作当前是否正在替换服务。
 pub(crate) fn maintaining() -> bool {
     false
 }
@@ -26,7 +22,7 @@ pub(crate) fn maintaining() -> bool {
 pub(crate) mod vault {
     use super::*;
 
-    /// Credentials stay in the user's Secret Service keyring.
+    /// 凭据保留在当前用户的 Secret Service 密钥环中。
     pub(crate) fn applies() -> Result<bool> {
         Ok(false)
     }
@@ -55,11 +51,11 @@ pub(crate) mod resident {
     use super::*;
     pub(crate) use crate::session::resident::{Reply, Request, Snapshot};
 
-    /// This process is never the service's resident account owner.
+    /// 本进程不担任服务常驻账号的持有者。
     pub(crate) fn is_owner() -> bool {
         false
     }
-    /// The desktop client always owns the account itself.
+    /// 账号始终由桌面客户端自行持有。
     pub(crate) fn managed() -> bool {
         false
     }
@@ -69,14 +65,14 @@ pub(crate) mod resident {
     pub(crate) fn call(_request: Request) -> Result<Reply> {
         bail!(NO_SERVICE)
     }
-    /// Only asked of a managed client; with no service there is nothing to retire.
+    /// 仅托管客户端需要暂停；当前没有账号托管服务，也就没有待退出的托管状态。
     pub(crate) async fn pause_for_exit() -> Result<()> {
         Ok(())
     }
 }
 
-/// Work the resident owner waits for before it reports itself paused. With no
-/// service there is no owner waiting, so nothing is counted.
+/// 常驻账号持有者在报告暂停前需要等待的工作。
+/// 当前没有账号托管服务和等待者，因此无需计数。
 pub(crate) mod activity {
     pub(crate) struct Work;
     impl Work {
@@ -165,17 +161,16 @@ pub(crate) mod startup {
     pub(crate) enum State {
         Disabled,
         Enabled,
-        /// Windows keeps a separate Startup Apps approval the program cannot
-        /// override. A desktop's disable switch is the unit or entry itself,
-        /// which the settings switch rewrites, so it reads as plain `Disabled`.
+        /// 原有 Windows 实现还存在程序不能覆盖的启动应用审批状态。
+        /// Linux 桌面的禁用状态由单元或自启动条目本身决定，设置开关会重写它们，
+        /// 因而这里只会读到普通的 `Disabled`。
         #[allow(dead_code)]
         DisabledByWindows,
     }
 
-    /// Whether login starts OpenUUYC on this desktop: the unit is enabled and
-    /// the desktop reaches its target, or the XDG entry is present and not
-    /// skipped. The settings switch and `systemctl --user enable/disable` are
-    /// the same thing where the unit is the mechanism.
+    /// 当前桌面登录时是否启动 OpenUUYC：单元已启用且桌面接入对应目标，
+    /// 或者 XDG 自启动条目存在且未被跳过。
+    /// 使用单元时，设置开关与 `systemctl --user enable/disable` 修改的是同一状态。
     pub(crate) fn state() -> Result<State> {
         Ok(if enabled()? {
             State::Enabled
@@ -184,8 +179,8 @@ pub(crate) mod startup {
         })
     }
 
-    /// The settings switch. There is no installed copy apart from the running
-    /// one, so login starts this program, as enabling remote wake does.
+    /// 设置页的自启开关。除当前运行的程序外，不另维护独立的安装副本，
+    /// 因此登录时启动的就是本程序，与启用远程唤醒时一致。
     pub(crate) fn configure(enabled: bool) -> Result<()> {
         if !enabled {
             return set_image(false, Path::new(""));
@@ -227,7 +222,7 @@ pub(crate) mod startup {
     /// 自启读写的位置。测试换成临时目录，碰不到真实的用户配置与系统里的单元。
     struct Places<'a> {
         config: PathBuf,
-        /// Directories a package installs user units into.
+        /// 安装包放置用户级单元的目录。
         packaged: &'a [&'a str],
         /// 测试指向一个不存在的程序，当作没有 systemd 的系统，免得读到、甚至停用
         /// 跑测试的人自己启用的单元。
@@ -442,8 +437,8 @@ pub(crate) mod startup {
 
     /// XDG 自启动条目，与改用 systemd 单元之前写的一模一样。
     fn entry_body(image: &str) -> String {
-        // Desktop Entry quoting: reserved characters get a backslash inside the
-        // quoted argument, and the file's string escaping doubles every backslash.
+        // 桌面条目的引号规则：在带引号的参数内为保留字符添加反斜杠，
+        // 文件层面的字符串转义还会把每个反斜杠再写成两个。
         let mut quoted = String::new();
         for c in image.chars() {
             match c {
@@ -618,7 +613,7 @@ pub(crate) mod startup {
             let directory = places.config.to_str().unwrap().to_owned();
             let packaged = [directory.as_str()];
             places.packaged = &packaged;
-            // A package directory without the unit does not count.
+            // 目录存在但没有对应单元文件时，不算已安装。
             assert!(!places.unit_name_installed(UNIT));
             std::fs::write(places.config.join(UNIT), "").unwrap();
             assert!(places.unit_name_installed(UNIT));
@@ -651,12 +646,11 @@ pub(crate) mod startup {
     }
 }
 
-/// Holds the per-user lock that lets only one process keep a device's
-/// presence room; two owners would keep kicking each other off the server.
+/// 持有每用户文件锁，确保同一设备的在线房间只由一个进程维护；
+/// 否则两个持有者会不断被服务端互相挤下线。
 pub(crate) struct PresenceReservation(#[allow(dead_code)] std::fs::File);
 
-/// Reserve the device's presence room, or `None` while another process of
-/// this user holds it.
+/// 预留设备的在线房间；同一用户的其他进程已持有时返回 `None`。
 pub(crate) fn reserve_presence(device: &str) -> Result<Option<PresenceReservation>> {
     anyhow::ensure!(
         !device.is_empty()
@@ -685,8 +679,7 @@ pub(crate) fn reserve_presence(device: &str) -> Result<Option<PresenceReservatio
     }
 }
 
-/// Refuse a path that is a symbolic link, the Linux counterpart of the
-/// Windows reparse-point check on service-owned directories.
+/// 拒绝符号链接路径，对应原有 Windows 实现对服务目录重解析点的检查。
 pub(crate) fn reject_reparse(path: &std::path::Path) -> Result<()> {
     if let Ok(metadata) = std::fs::symlink_metadata(path) {
         anyhow::ensure!(!metadata.file_type().is_symlink(), "组件目录不可为符号链接");

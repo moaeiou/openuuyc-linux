@@ -1,3 +1,5 @@
+#![expect(dead_code, reason = "Linux 播放器尚未接入批注界面，保留现有绘制实现")]
+
 use crate::features::stream_control::{
     StreamControlHandle,
     annotation::{LaserOptions, Point, Stroke as InkStroke, Style},

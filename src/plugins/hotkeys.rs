@@ -1,4 +1,9 @@
 //! Foreground-only graph activation signals. No input injection or aiming policy.
+#![expect(
+    dead_code,
+    reason = "插件编辑器使用快捷键配置类型，Linux 播放器尚未接入执行端"
+)]
+
 use super::*;
 use std::sync::{Arc, Mutex, OnceLock};
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

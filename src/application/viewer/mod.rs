@@ -323,7 +323,7 @@ pub(crate) struct ViewerLaunchConfig {
     pub receiver_feedback: mpsc::UnboundedSender<VideoReceiverFeedback>,
     pub performance: PerformanceMonitor,
     pub stream_control: StreamControlHandle,
-    pub display: ViewerDisplayHandle,
+    pub _display: ViewerDisplayHandle,
 }
 
 impl NativeViewerSession {
@@ -343,7 +343,7 @@ impl NativeViewerSession {
             receiver_feedback,
             performance,
             stream_control,
-            display: _,
+            _display: _,
         } = config;
         let (video_sink, video_source) = mpsc::unbounded_channel();
         let frame_queue = Arc::new(Mutex::new(None));

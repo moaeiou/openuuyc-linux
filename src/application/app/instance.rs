@@ -1,4 +1,4 @@
-//! One control center per desktop login session, independent of the EXE name.
+//! 每个桌面登录会话只运行一个控制中心，不依赖可执行文件名称。
 
 /// 第二个进程要不要把已经在跑的控制中心叫到前台，以及顺带交给它的东西。
 #[derive(Clone, Copy)]
@@ -18,7 +18,7 @@ mod platform {
     use std::fs::{File, OpenOptions};
     use std::path::PathBuf;
 
-    /// The advisory lock lives as long as this handle; the file itself stays behind.
+    /// 协作式文件锁随句柄存活，句柄关闭后锁文件本身仍保留。
     pub struct Instance(#[allow(dead_code)] File);
 
     fn lock_path() -> PathBuf {
@@ -26,7 +26,7 @@ mod platform {
             .map(PathBuf::from)
             .filter(|path| path.is_dir())
             .unwrap_or_else(std::env::temp_dir);
-        // Per-user, so a shared /tmp fallback cannot collide across accounts.
+        // 按用户区分，回退到共享 /tmp 目录时也不会在不同账户间冲突。
         base.join(format!("openuuyc-control-center-{}.lock", unsafe {
             libc::getuid()
         }))
@@ -82,13 +82,13 @@ mod platform {
         }
     }
 
-    /// X11 and Wayland have no portable window-property handshake; the lock file
-    /// is the whole reservation and the running window is left untouched.
+    /// X11 和 Wayland 没有通用的窗口属性握手机制；实例占用由锁文件决定，
+    /// 此处不改动已运行的窗口。
     pub(crate) fn register_window(_window: &winit::window::Window) -> Result<()> {
         Ok(())
     }
 
-    /// Only the Windows updater asks a running control center to exit.
+    /// 只有原有 Windows 更新流程才会请求已运行的控制中心退出。
     pub(crate) fn take_update_exit() -> bool {
         false
     }

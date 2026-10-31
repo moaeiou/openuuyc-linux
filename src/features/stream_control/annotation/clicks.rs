@@ -2,9 +2,11 @@
 use super::*;
 
 const LIFETIME: Duration = Duration::from_millis(450);
+#[expect(dead_code, reason = "保留远端点击提示协议，Linux 尚未接入本地点按上报")]
 const MAX_CLICKS: usize = 4;
 
 pub(super) struct ClickPulse {
+    #[expect(dead_code, reason = "保留远端点击提示协议，Linux 尚未接入本地点按上报")]
     owner: u64,
     stroke: Stroke,
     center: Point,
@@ -15,6 +17,7 @@ pub(super) struct ClickPulse {
     shown: bool,
     cancelled: bool,
 }
+#[expect(dead_code, reason = "保留远端点击提示协议，Linux 尚未接入本地点按上报")]
 pub(super) fn stop(a: &mut Annotation, owner: u64) {
     for pulse in &mut a.clicks {
         if pulse.owner == owner {
@@ -62,6 +65,7 @@ fn update(pulse: &mut ClickPulse, now: Instant) -> bool {
     true
 }
 impl StreamControlHandle {
+    #[expect(dead_code, reason = "保留远端点击提示协议，Linux 尚未接入本地点按上报")]
     pub(crate) fn annotation_pointer_click(
         &self,
         owner: u64,

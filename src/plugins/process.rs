@@ -1,3 +1,8 @@
+#![expect(
+    dead_code,
+    reason = "插件宿主仍使用协议及分析槽，Linux 播放器尚未接入分析运行时"
+)]
+
 use super::*;
 
 use std::{

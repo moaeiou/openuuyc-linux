@@ -58,6 +58,7 @@ impl StreamControlHandle {
         Some((screen.id, screen.width, screen.height))
     }
 
+    #[expect(dead_code, reason = "Linux 播放器尚未使用本地鼠标恢复点和批注暂停接口")]
     pub(crate) fn take_mouse_restore_point(&self, track: i32) -> Option<[f64; 2]> {
         let mut s = lock(&self.shared);
         let screen = s
@@ -95,6 +96,7 @@ impl StreamControlHandle {
         self.change_mouse_mode(mode, true)
     }
 
+    #[expect(dead_code, reason = "Linux 播放器尚未使用本地鼠标恢复点和批注暂停接口")]
     pub(crate) fn suspend_mouse_control(&self) -> Result<()> {
         self.change_mouse_mode(MouseMode::View, false)
     }

@@ -72,6 +72,7 @@ impl StreamControlHandle {
             pending,
         )
     }
+    #[expect(dead_code, reason = "保留原生批注协议类型，Linux 尚未接入本地编辑入口")]
     pub(super) fn edit_native(
         &self,
         s: &mut StreamControlState,

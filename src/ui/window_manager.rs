@@ -9,7 +9,6 @@ use winit::{event_loop::EventLoopProxy, window::WindowId};
 
 pub(crate) struct Repaint {
     pub window: WindowId,
-    pub generation: u64,
     pub pass: u64,
     pub when: Instant,
 }

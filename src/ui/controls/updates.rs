@@ -1,3 +1,8 @@
+#![expect(
+    dead_code,
+    reason = "升级操作仍供界面使用，Linux 尚未接入完整远端升级提示"
+)]
+
 use super::*;
 use egui::{Align, Align2, FontId, Rect, Sense, pos2};
 

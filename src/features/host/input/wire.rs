@@ -376,3 +376,85 @@ pub(crate) fn touch(bytes: &[u8]) -> Result<Option<Event>> {
         points,
     }))
 }
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_valid_motion_and_rejects_invalid_coordinates() {
+        assert!(
+            Event::Absolute {
+                screen: None,
+                x: 0.0,
+                y: 1.0
+            }
+            .validate()
+            .is_ok()
+        );
+        for x in [f64::NAN, f64::INFINITY, -0.1, 1.1] {
+            assert!(
+                Event::Absolute {
+                    screen: None,
+                    x,
+                    y: 0.5
+                }
+                .validate()
+                .is_err()
+            );
+        }
+        assert!(Event::Relative { x: i32::MIN, y: 0 }.validate().is_err());
+        assert!(
+            Event::RelativeScaled {
+                screen: None,
+                x: 2.0,
+                y: 0.0
+            }
+            .validate()
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn enforces_text_size_before_injection() {
+        assert!(Event::Text("a".repeat(MAX_TEXT)).validate().is_ok());
+        assert!(Event::Text("a".repeat(MAX_TEXT + 1)).validate().is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_touch_ids_and_invalid_touch_kind() {
+        let point = Point {
+            id: 1,
+            x: 0.5,
+            y: 0.5,
+            radius_x: 0.0,
+            radius_y: 0.0,
+            angle: 0.0,
+            pressure: 0.5,
+        };
+        assert!(
+            Event::Touch {
+                kind: 1,
+                points: vec![point.clone()]
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            Event::Touch {
+                kind: 1,
+                points: vec![point.clone(), point]
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            Event::Touch {
+                kind: 0,
+                points: vec![]
+            }
+            .validate()
+            .is_err()
+        );
+    }
+}

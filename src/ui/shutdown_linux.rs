@@ -6,17 +6,14 @@
 //! 的接口，所以按老办法：处理函数往自建管道里写一个字节（异步信号安全），一个后台
 //! 线程读到就通过窗口管理器请求退出。
 //!
-//! Only the first signal asks for that exit. The handler puts both signals
-//! back to their default action as it runs, so if the exit is refused (the
-//! background shutdown failed) or hangs, the next SIGTERM or Ctrl+C ends the
-//! process as it would without this module, and systemd's stop timeout is
-//! never the only way out.
+//! 只有首次信号会请求正常退出。处理函数运行时将两个信号恢复为默认行为，
+//! 因而即使退出被拒绝（后台关闭失败）或挂起，下一次 SIGTERM 或 Ctrl+C
+//! 仍能直接结束进程，不必只能等待 systemd 的停止超时。
 //!
-//! The handler chains to whatever was installed before it, as
-//! signal-hook-registry (tokio's signal support) does in turn for handlers
-//! installed after it, so a hosted viewer's `tokio::signal::ctrl_c` keeps
-//! seeing Ctrl+C. A signal the process inherited as ignored (a background
-//! job, `nohup`) stays ignored.
+//! 处理函数会串联先前安装的处理函数；signal-hook-registry（tokio 的信号支持）
+//! 也会为后续安装的处理函数做同样的事，因此进程内观看端的
+//! `tokio::signal::ctrl_c` 仍能收到 Ctrl+C。
+//! 对于后台任务或 `nohup` 等场景继承的忽略状态，则继续忽略该信号。
 use anyhow::{Context, Result};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
@@ -26,13 +23,13 @@ const SIGNALS: [libc::c_int; 2] = [libc::SIGTERM, libc::SIGINT];
 static WAKE_WRITE: AtomicI32 = AtomicI32::new(-1);
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 
-/// What each signal had before this module, written once before the handler
-/// is installed and only read afterwards (by the handler too).
+/// 保存安装本模块前各信号的处理方式；在注册处理函数前只写一次，
+/// 之后仅供读取，处理函数也遵循此规则。
 struct Previous(std::cell::UnsafeCell<[Option<libc::sigaction>; 2]>);
-// SAFETY: written only by `install` before any handler can run, read-only after.
+// SAFETY: 仅由 `install` 在处理函数可能运行之前写入，之后只读。
 unsafe impl Sync for Previous {}
 static PREVIOUS: Previous = Previous(std::cell::UnsafeCell::new([None, None]));
-/// Which of [`SIGNALS`] this module handles.
+/// 本模块实际处理的 [`SIGNALS`] 成员。
 static HANDLED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
 extern "C" fn on_signal(
@@ -40,12 +37,12 @@ extern "C" fn on_signal(
     info: *mut libc::siginfo_t,
     context: *mut libc::c_void,
 ) {
-    // SAFETY: errno is thread-local; everything below is async-signal-safe
-    // (sigaction, write) and restores errno for the interrupted code.
+    // SAFETY: errno 是线程局部变量；下方的 sigaction、write 等操作均为异步信号安全，
+    // 并在返回前为被中断的代码恢复 errno。
     let errno = unsafe { *libc::__errno_location() };
     for (index, other) in SIGNALS.into_iter().enumerate() {
         if HANDLED[index].load(Ordering::Relaxed) {
-            // SAFETY: a zeroed sigaction is SIG_DFL with an empty mask.
+            // SAFETY: 全零的 sigaction 表示 SIG_DFL，且信号掩码为空。
             unsafe {
                 let mut default: libc::sigaction = std::mem::zeroed();
                 default.sa_sigaction = libc::SIG_DFL;
@@ -56,25 +53,24 @@ extern "C" fn on_signal(
     let fd = WAKE_WRITE.load(Ordering::Relaxed);
     if fd >= 0 {
         let byte = 1u8;
-        // SAFETY: one byte from a valid address into a non-blocking pipe; a
-        // full pipe already holds a pending request.
+        // SAFETY: 从有效地址向非阻塞管道写入一个字节；
+        // 管道已满说明其中已经有待处理的请求。
         unsafe {
             libc::write(fd, std::ptr::from_ref(&byte).cast(), 1);
         }
     }
     if let Some(index) = SIGNALS.iter().position(|&known| known == signal) {
-        // SAFETY: PREVIOUS is no longer written once handlers run.
+        // SAFETY: 处理函数开始运行后，PREVIOUS 不会再被写入。
         if let Some(previous) = unsafe { (*PREVIOUS.0.get())[index] } {
-            // SAFETY: calling the handler that was installed, with the
-            // arguments the kernel gave this one, as its flags declare.
+            // SAFETY: 按原处理函数声明的标志，使用内核传给本处理函数的参数调用它。
             unsafe { chain(&previous, signal, info, context) };
         }
     }
-    // SAFETY: as above.
+    // SAFETY: 安全依据同上。
     unsafe { *libc::__errno_location() = errno };
 }
 
-/// Run the handler that was installed before ours, if it was a function.
+/// 若先前安装的是函数处理器，则调用该函数。
 unsafe fn chain(
     previous: &libc::sigaction,
     signal: libc::c_int,
@@ -86,12 +82,12 @@ unsafe fn chain(
         return;
     }
     if previous.sa_flags & libc::SA_SIGINFO != 0 {
-        // SAFETY: SA_SIGINFO handlers take these three arguments.
+        // SAFETY: SA_SIGINFO 处理函数接收这三个参数。
         let handler: extern "C" fn(libc::c_int, *mut libc::siginfo_t, *mut libc::c_void) =
             unsafe { std::mem::transmute(handler) };
         handler(signal, info, context);
     } else {
-        // SAFETY: plain handlers take the signal number.
+        // SAFETY: 普通信号处理函数只接收信号编号。
         let handler: extern "C" fn(libc::c_int) = unsafe { std::mem::transmute(handler) };
         handler(signal);
     }
@@ -102,8 +98,8 @@ pub(crate) fn install() -> Result<()> {
     install_with(|| super::window_manager::send(super::window_manager::Request::Exit).is_ok())
 }
 
-/// Install the handler; `notify` runs on a background thread for each
-/// signal and returns false once nobody is left to tell.
+/// 安装信号处理函数；每收到一个信号，后台线程就调用一次 `notify`，
+/// 没有可通知的接收者时返回 false。
 fn install_with(mut notify: impl FnMut() -> bool + Send + 'static) -> Result<()> {
     anyhow::ensure!(
         !INSTALLED.swap(true, Ordering::AcqRel),
@@ -117,8 +113,8 @@ fn install_with(mut notify: impl FnMut() -> bool + Send + 'static) -> Result<()>
         std::io::Error::last_os_error()
     );
     let [read, write] = fds;
-    // The handler must never block on a full pipe.
-    // SAFETY: `write` is the pipe's write end, just created.
+    // 处理函数绝不能因为管道已满而阻塞。
+    // SAFETY: `write` 是刚创建的管道写入端。
     anyhow::ensure!(
         unsafe { libc::fcntl(write, libc::F_SETFL, libc::O_NONBLOCK) } == 0,
         "设置退出信号管道失败：{}",
@@ -138,7 +134,7 @@ fn install_with(mut notify: impl FnMut() -> bool + Send + 'static) -> Result<()>
         })
         .context("启动退出信号线程失败")?;
     for (index, signal) in SIGNALS.into_iter().enumerate() {
-        // SAFETY: queries the current action into a zeroed struct.
+        // SAFETY: 将当前信号处理方式查询到已清零的结构体中。
         let current = unsafe {
             let mut current: libc::sigaction = std::mem::zeroed();
             anyhow::ensure!(
@@ -152,11 +148,11 @@ fn install_with(mut notify: impl FnMut() -> bool + Send + 'static) -> Result<()>
             tracing::info!(signal, "信号被启动方设为忽略，保持忽略");
             continue;
         }
-        // SAFETY: no handler of ours runs before HANDLED is set below.
+        // SAFETY: 下方设置 HANDLED 之前，本模块的处理函数不会运行。
         unsafe { (*PREVIOUS.0.get())[index] = Some(current) };
         HANDLED[index].store(true, Ordering::Relaxed);
-        // SAFETY: the handler only does async-signal-safe work; both signals
-        // are blocked while it runs so one cannot interrupt the other.
+        // SAFETY: 处理函数只执行异步信号安全的操作；运行期间屏蔽这两个信号，
+        // 避免其中一个信号中断另一个的处理。
         let installed = unsafe {
             let mut action: libc::sigaction = std::mem::zeroed();
             action.sa_sigaction = on_signal as *const () as libc::sighandler_t;
@@ -178,9 +174,8 @@ fn install_with(mut notify: impl FnMut() -> bool + Send + 'static) -> Result<()>
 
 #[cfg(test)]
 mod tests {
-    //! Signal dispositions are per process, so each scenario runs in a child
-    //! process: this test binary again, filtered to this test, with the
-    //! scenario in an environment variable.
+    //! 信号处理方式属于进程级状态，因此每个场景都在子进程中运行：
+    //! 再次启动本测试程序，筛选到当前测试，并通过环境变量传递场景。
     use super::*;
     use std::os::unix::process::ExitStatusExt;
     use std::sync::mpsc;
@@ -189,7 +184,7 @@ mod tests {
     const SCENARIO: &str = "OPENUUYC_SIGNAL_SCENARIO";
 
     fn disposition(signal: libc::c_int) -> libc::sighandler_t {
-        // SAFETY: a query into a zeroed struct.
+        // SAFETY: 查询结果写入已清零的结构体。
         unsafe {
             let mut current: libc::sigaction = std::mem::zeroed();
             libc::sigaction(signal, std::ptr::null(), &mut current);
@@ -198,11 +193,11 @@ mod tests {
     }
 
     fn raise(signal: libc::c_int) {
-        // SAFETY: raising a signal the scenario handles or expects to die of.
+        // SAFETY: 触发当前场景已处理或预期会终止进程的信号。
         unsafe { libc::raise(signal) };
     }
 
-    /// Runs inside the child.
+    /// 在子进程中运行。
     fn scenario(name: &str) {
         let (sender, notified) = mpsc::channel();
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -217,7 +212,7 @@ mod tests {
                 .is_ok()
         };
         match name {
-            // A hosted viewer's tokio listener registered after us.
+            // 进程内观看端的 tokio 监听器在本模块之后注册。
             "tokio-after" => {
                 install_with(move || sender.send(()).is_ok()).unwrap();
                 let mut tokio_int = runtime
@@ -233,7 +228,7 @@ mod tests {
                 println!("first-signal-handled");
                 raise(libc::SIGINT);
             }
-            // A tokio listener registered before us.
+            // tokio 监听器在本模块之前注册。
             "tokio-before" => {
                 let mut tokio_term = runtime
                     .block_on(async {
@@ -247,9 +242,9 @@ mod tests {
                 println!("first-signal-handled");
                 raise(libc::SIGTERM);
             }
-            // Inherited as ignored: left ignored, nothing asked.
+            // 继承的忽略状态保持不变，不发出退出请求。
             "ignored" => {
-                // SAFETY: setting SIGINT to ignored in this child.
+                // SAFETY: 仅在当前子进程中将 SIGINT 设置为忽略。
                 unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
                 install_with(move || sender.send(()).is_ok()).unwrap();
                 raise(libc::SIGINT);

@@ -58,12 +58,20 @@ pub enum MouseMode {
 
 #[derive(Clone, Debug)]
 pub(crate) enum InputEvent {
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     Correction {
         x: i32,
         y: i32,
         lease: u64,
         expires: std::time::Instant,
     },
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     AssistButton {
         down: bool,
         lease: u64,
@@ -167,6 +175,10 @@ pub(crate) struct QueuedInputEvent {
     pub event: InputEvent,
 }
 
+#[expect(
+    dead_code,
+    reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+)]
 pub(crate) struct CorrectionBasis {
     pub physical: [i64; 2],
     pub submitted_corrections: Option<[i64; 2]>,
@@ -252,6 +264,10 @@ impl RemoteInput {
         self.lock().accept_host_input = allowed;
     }
 
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub(crate) fn accepts_host_input(&self) -> bool {
         self.lock().accept_host_input
     }
@@ -311,6 +327,10 @@ impl RemoteInput {
         self.lock().keyboard_platform = platform;
     }
 
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn keyboard_generation(&self) -> u64 {
         self.lock().keyboard_generation
     }
@@ -585,6 +605,10 @@ impl RemoteInput {
         )
     }
 
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn subscribe(
         &self,
         callback: impl Fn() + Send + Sync + 'static,
@@ -1290,9 +1314,17 @@ impl RemoteInput {
         };
         token.cancelled().await;
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn motion(&self) -> [i64; 2] {
         self.lock().physical_motion
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn observation(&self) -> ([i64; 2], [i64; 2], [i64; 2], bool, bool) {
         let s = self.lock();
         (
@@ -1312,6 +1344,10 @@ impl RemoteInput {
                     .any(|e| matches!(e, InputEvent::Correction { .. })),
         )
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn begin_assist(
         &self,
         owner: u64,
@@ -1331,10 +1367,18 @@ impl RemoteInput {
         s.assists.insert(lease, (owner, guard));
         Ok(())
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn assist_pending(&self, lease: u64) -> bool {
         let s = self.lock();
         s.in_flight_assist==Some(lease)||s.queue.iter().any(|e|matches!(e,InputEvent::Correction{lease:id,..}|InputEvent::AssistButton{lease:id,..} if *id==lease))
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn assist_active(&self, owner: u64, lease: u64) -> bool {
         let s = self.lock();
         s.ready
@@ -1346,6 +1390,10 @@ impl RemoteInput {
                 .get(&lease)
                 .is_some_and(|(o, g)| *o == owner && g())
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn end_assist(&self, lease: u64) {
         let mut s = self.lock();
         if s.assists.remove(&lease).is_none() {
@@ -1366,6 +1414,10 @@ impl RemoteInput {
         drop(s);
         self.wake.notify_one();
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn assist_correction(
         &self,
         owner: u64,
@@ -1422,6 +1474,10 @@ impl RemoteInput {
         self.wake.notify_one();
         accepted
     }
+    #[expect(
+        dead_code,
+        reason = "保留辅助控制协议接口，Linux 播放器尚未接入对应操作"
+    )]
     pub fn assist_button(&self, owner: u64, lease: u64, down: bool) -> bool {
         let mut s = self.lock();
         if !s.ready

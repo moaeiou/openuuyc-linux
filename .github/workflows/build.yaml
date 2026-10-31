@@ -14,6 +14,7 @@ jobs:
       fail-fast: false
     outputs:
       tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@main
         with:
@@ -23,9 +24,19 @@ jobs:
         id: version
         shell: bash
         run: |
-          version=$(sed -n '/^\[package\]/,/^\[/ { s/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p; }' Cargo.toml)
-          test -n "$version"
-          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          python3 - <<'PYTHON'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          with open("Cargo.toml", "rb") as manifest:
+              version = tomllib.load(manifest)["package"]["version"]
+          if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
+              raise SystemExit(f"Expected a stable major.minor.patch version, got: {version}")
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
+              output.write(f"version={version}\ntag=v{version}\n")
+          PYTHON
 
       - name: Install build dependencies
         run: |
@@ -74,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     env:
-      RELEASE_TAG: ${{ needs.dpkg.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.dpkg.outputs.version }}
     steps:
       - name: Install dependencies
         shell: bash
@@ -90,62 +101,33 @@ jobs:
           name: release_dpkg
           path: dist
 
-      - name: Archive (For the other Linux distributions)
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          stage="openuuyc-${version}-x86_64-linux"
-          mkdir -p "$stage"
-          # Artifact downloads do not preserve executable permissions.
-          chmod +x dist/openuuyc
-          # Keep the package/ layout in the release archive.
-          install -Dm755 dist/openuuyc "$stage/openuuyc"
-          install -Dm755 package/omarchy/install-omarchy.sh "$stage/package/omarchy/install-omarchy.sh"
-          for file in package/linux/openuuyc.desktop \
-            package/linux/60-openuuyc-uinput.rules \
-            package/linux/openuuyc.service \
-            package/linux/openuuyc-vkms.socket \
-            package/linux/openuuyc-vkms.service \
-            package/omarchy/omarchy-menu.jsonc assets/icon-256.png \
-            LICENSE NOTICES.md; do
-            install -Dm644 "$file" "$stage/$file"
-          done
-          tar --zstd -cf "dist/$stage.tar.zst" "$stage"
-          ls -lh "dist/$stage.tar.zst" dist/openuuyc
-
       - name: Build the pacman package
         shell: bash
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          stage="openuuyc-${version}-x86_64-linux"
-          mkdir -p /tmp/pacman-package
-          cp package/arch/{PKGBUILD,openuuyc.install} /tmp/pacman-package/
-          # Reuse the package layout, but package this run's prebuilt archive.
-          sed -i 's|target/release/||g; s|cd "$pkgname"|cd "$_dir"|g' /tmp/pacman-package/PKGBUILD
-          cp "dist/$stage.tar.zst" /tmp/pacman-package/
-          # Override the release download: package the binaries built by this run.
-          # Keep Cargo's SemVer unchanged; split the version only for Arch.
-          # 1.0.2-beta.6 -> pkgver=1.0.2, pkgrel=6; stable releases default to 1.
-          pkgver=$(printf '%s\n' "$version" | sed -nE 's/^([0-9]+\.[0-9]+\.[0-9]+)(-[[:alpha:]]+\.[0-9]+)?$/\1/p')
-          pkgrel=$(printf '%s\n' "$version" | sed -nE 's/^[0-9]+\.[0-9]+\.[0-9]+-[[:alpha:]]+\.([0-9]+)$/\1/p')
-          pkgrel="${pkgrel:-1}"
-          if [[ -z "$pkgver" || ! "$pkgrel" =~ ^[1-9][0-9]*$ ]]; then
-            printf 'Cannot derive Arch package version from release tag: %s\n' "$RELEASE_TAG" >&2
+          version="$RELEASE_VERSION"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            printf 'Invalid stable release version: %s\n' "$version" >&2
             exit 1
           fi
-          printf 'Release tag: %s; Arch pkgver: %s; pkgrel: %s\n' "$RELEASE_TAG" "$pkgver" "$pkgrel"
-          sed -i \
-            -e "s|@PKGVER@|$pkgver|g" \
-            -e "s|@PKGREL@|$pkgrel|g" \
-            /tmp/pacman-package/PKGBUILD
-          printf '\n_dir=%q\nsource=(%q)\nsha256sums=(SKIP)\nprepare() { :; }\nbuild() { :; }\n' \
-            "$stage" "$stage.tar.zst" \
-            >> /tmp/pacman-package/PKGBUILD
+          mkdir -p /tmp/pacman-package/src/openuuyc/{target/release,assets}
+          cp package/arch/{PKGBUILD,openuuyc.install} /tmp/pacman-package/
+          # 直接使用本轮二进制和检出的打包文件，不依赖中间压缩包。
+          install -Dm755 dist/openuuyc /tmp/pacman-package/src/openuuyc/target/release/openuuyc
+          cp -a package /tmp/pacman-package/src/openuuyc/
+          cp assets/icon-256.png /tmp/pacman-package/src/openuuyc/assets/
+          cp LICENSE NOTICES.md /tmp/pacman-package/src/openuuyc/
+          sed -i "s|@PKGVER@|$version|g" /tmp/pacman-package/PKGBUILD
+          # 版本号原样使用，pkgrel 固定为 1；跳过源码下载和重复构建。
+          cat >> /tmp/pacman-package/PKGBUILD <<'PKGBUILD'
+          source=()
+          sha256sums=()
+          prepare() { :; }
+          build() { :; }
+          PKGBUILD
           useradd --create-home builder
           chown -R builder:builder /tmp/pacman-package
-          runuser -u builder -- bash -c 'cd /tmp/pacman-package && makepkg --nodeps --noconfirm'
+          runuser -u builder -- bash -c 'cd /tmp/pacman-package && makepkg --noextract --nodeps --noconfirm'
           mkdir -p dist
           cp /tmp/pacman-package/*.pkg.tar.zst dist/
           pacman -Qip dist/*.pkg.tar.zst
@@ -157,14 +139,13 @@ jobs:
           files: |
             dist/*.pkg.tar.zst
             dist/*.deb
-            dist/openuuyc-*-x86_64-linux.tar.zst
             dist/openuuyc
           body: |
             # OpenUUYC ${{ needs.dpkg.outputs.tag }}
             ## 📝 Release Notes
             - Fixes and improvements.
             ## For the ArchLinux users
-            - Install the package use filename like `openuuyc-1.0.2-beta.6-x86_64-linux.pkg.tar.zst` with `pacman -U <filename>`.
-            - And the `openuuyc-1.0.2-beta.6-x86_64-linux.tar.zst` is for other Linux distributions, you can extract it and run the binaries directly.
+            - Install the Arch package with `sudo pacman -U openuuyc-${{ needs.dpkg.outputs.version }}-1-x86_64.pkg.tar.zst`.
+            - Debian/Ubuntu users can install the `.deb`; the standalone `openuuyc` executable is also available.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

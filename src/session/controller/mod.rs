@@ -669,7 +669,7 @@ impl ControllerConnection {
             receiver_feedback,
             performance: performance.clone(),
             stream_control,
-            display,
+            _display: display,
         })
         .await?;
         viewer.attach_screen_playback(&self.peer, profile, alias, track_index);

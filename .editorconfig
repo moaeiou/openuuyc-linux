@@ -6,7 +6,7 @@ end_of_line = lf
 [*.{bat,cmd}]
 end_of_line = crlf
 
-# Preserve bytes covered by driver catalog signatures.
+# 保留驱动目录签名所覆盖文件的原始字节。
 [assets/drivers/**]
 end_of_line = unset
 

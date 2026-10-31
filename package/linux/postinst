@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+# 首装与升级都接通 socket；不要 start service，内核操作仍由首次请求触发。
+if [ "${1:-}" = configure ] && command -v systemctl >/dev/null 2>&1; then
+    # enable 不依赖正在运行的 systemd，离线安装后下次开机也会监听。
+    systemctl --system enable openuuyc-vkms.socket >/dev/null ||
+        echo "OpenUUYC：无法自动启用 VKMS socket，请检查 systemd 配置。" >&2
+    if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload || true
+        systemctl --system start openuuyc-vkms.socket ||
+            echo "OpenUUYC：VKMS socket 未能启动，虚拟显示器诊断页会显示状态。" >&2
+    fi
+fi
+
+exit 0

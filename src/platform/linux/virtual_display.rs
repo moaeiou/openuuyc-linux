@@ -268,8 +268,8 @@ pub(crate) fn availability() -> Availability {
     }
     if !std::path::Path::new(openuuyc_vkms::SOCKET).exists() {
         return Availability {
-            label: "已安装，服务未启用".into(),
-            detail: Some("运行 systemctl enable --now openuuyc-vkms.socket 之后即可使用。".into()),
+            label: "已安装，套接字未监听".into(),
+            detail: Some("安装包通常会自动启用 VKMS socket。若未监听，请检查系统日志，或运行 sudo systemctl daemon-reload && sudo systemctl enable --now openuuyc-vkms.socket；可用性仍取决于内核和合成器。".into()),
         };
     }
     // 服务能起来不等于现在能用：合成器接不住的话，屏建出来也没人把它摆进桌面。

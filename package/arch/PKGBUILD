@@ -1,17 +1,17 @@
-# Maintainer: risent <shengqi542@gmail.com>
+# 维护者： risent <shengqi542@gmail.com>
 #
-# Source package tracking the Linux port's branch (DoyoDia/openuuyc-linux linux-port).
-# Builds from source; expect 20-40 minutes and ~4 GB of RAM on first build.
-# Template: build.yaml splits the Cargo version before invoking makepkg:
-# 1.0.2-beta.6 becomes @PKGVER@=1.0.2 and @PKGREL@=6 (stable defaults to 1).
+# 本仓库稳定版本的源码安装包。
+# 从源码构建；首次构建预计需要 20～40 分钟和约 4 GB 内存。
+# 模板：build.yaml 将 Cargo 的主版本.次版本.修订号原样填入 @PKGVER@。
+# pkgrel 固定为 1，无需转换上游预发布版本号。
 
 pkgname=openuuyc
 _pkgname=openuuyc
 pkgver=@PKGVER@
-pkgrel=@PKGREL@
+pkgrel=1
 pkgdesc="Third-party UU Remote client (Linux port, X11 and Wayland)"
 arch=('x86_64')
-url="https://github.com/DoyoDia/openuuyc-linux"
+url="https://github.com/moaeiou/openuuyc-linux"
 license=('custom')
 depends=('gcc-libs' 'fuse3' 'libx11' 'libxcb' 'libxrandr' 'libxi' 'libxcursor'
          'libxfixes' 'libxkbcommon' 'libxkbcommon-x11' 'wayland'
@@ -30,18 +30,18 @@ optdepends=(
     'ethtool: remote power-on NIC check'
     'librsvg: SVG file-type icons in host drag preview images'
 )
-makedepends=('cargo' 'rust' 'cmake' 'clang' 'nasm' 'pkg-config')
+makedepends=('cargo' 'rust' 'cmake' 'clang' 'nasm' 'pkg-config' 'git')
 conflicts=('openuuyc-bin' 'openuuyc-git')
-# The release profile keeps only debuginfo; nothing is left to split out.
+# 发布配置已剥离调试信息，不再另行拆分调试包。
 options=('!debug')
 install=openuuyc.install
-source=("$pkgname::git+${url}.git#branch=linux-port")
+source=("$pkgname::git+${url}.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
 prepare() {
     cd "$pkgname"
-    # Keep the build reproducible and avoid picking up a developer's local
-    # cargo config; the crates.io index and git checkouts land in $srcdir.
+    # 使用独立的 Cargo 配置目录保证构建可复现，避免读取开发者的本地设置；
+    # crates.io 索引与 Git 检出内容统一放在 $srcdir 下。
     export CARGO_HOME="$srcdir/cargo"
     mkdir -p "$CARGO_HOME"
 }

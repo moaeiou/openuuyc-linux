@@ -1,3 +1,8 @@
+#![expect(
+    dead_code,
+    reason = "设置界面使用插件图标，Linux 播放器尚未接入分析覆盖层"
+)]
+
 use super::process::{Runtime, Shared, lock};
 use super::*;
 use std::{

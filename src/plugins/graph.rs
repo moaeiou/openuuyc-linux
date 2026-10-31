@@ -109,9 +109,25 @@ pub(crate) struct AnalysisSpec {
 }
 #[derive(Clone)]
 pub(crate) struct Compiled {
+    #[expect(
+        dead_code,
+        reason = "节点编辑器保留完整编译计划，Linux 播放器尚未执行视频和分析链"
+    )]
     pub document: Document,
+    #[expect(
+        dead_code,
+        reason = "节点编辑器保留完整编译计划，Linux 播放器尚未执行视频和分析链"
+    )]
     pub videos: Vec<super::video::VideoRequest>,
+    #[expect(
+        dead_code,
+        reason = "节点编辑器保留完整编译计划，Linux 播放器尚未执行视频和分析链"
+    )]
     pub output_source: u64,
+    #[expect(
+        dead_code,
+        reason = "节点编辑器保留完整编译计划，Linux 播放器尚未执行视频和分析链"
+    )]
     pub analyses: Vec<AnalysisSpec>,
     pub warnings: Vec<String>,
 }

@@ -71,6 +71,10 @@ impl StreamControlHandle {
         .await
         .map_err(|_| anyhow!("媒体控制通道握手超时"))
     }
+    #[expect(
+        dead_code,
+        reason = "保留切换时终止更新获取的接口，Linux 播放器尚未接入"
+    )]
     pub(crate) async fn stop_acquire_update(&self) -> Result<()> {
         let (complete, done) = tokio::sync::oneshot::channel();
         {

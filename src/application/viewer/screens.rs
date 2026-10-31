@@ -338,7 +338,7 @@ impl ScreenPlayback {
             receiver_feedback: track.feedback.clone(),
             performance: track.performance.clone(),
             stream_control: self.control.clone(),
-            display,
+            _display: display,
         })
         .await?;
         session.track_index = track.index;

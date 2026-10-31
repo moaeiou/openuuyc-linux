@@ -109,17 +109,6 @@ impl LinuxVideoDecoder {
         })
     }
 
-    pub fn probe_format(
-        _device: GpuDevice,
-        codec: VideoCodec,
-        width: u32,
-        height: u32,
-        depth: u8,
-        chroma: u8,
-    ) -> bool {
-        vaapi::probe(codec, width, height, depth, chroma)
-    }
-
     pub fn poll_owned_frame(&mut self) -> Result<Option<PlatformDecodedFrame>, DecodeError> {
         if self.notification.is_cancelled() {
             self.pending.clear();

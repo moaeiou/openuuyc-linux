@@ -560,13 +560,6 @@ pub fn viewer_device_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     response.on_hover_text("切换在线设备")
 }
 
-pub fn viewer_caption_separator(ui: &egui::Ui, center: egui::Pos2) {
-    ui.painter().line_segment(
-        [center - vec2(0.0, 8.0), center + vec2(0.0, 8.0)],
-        Stroke::new(1.0, LINE),
-    );
-}
-
 pub fn device_menu_header(ui: &mut egui::Ui, busy: bool) -> bool {
     let (rect, _) = ui.allocate_exact_size(
         vec2(ui.available_width(), theme::MENU_HEIGHT),
@@ -786,18 +779,6 @@ pub(crate) fn centered_button(label: &str) -> egui::Button<'_> {
         .min_size(vec2(64.0, theme::CONTROL_HEIGHT))
 }
 
-pub(crate) fn centered_primary(label: &str) -> egui::Button<'_> {
-    egui::Button::new((
-        egui::Atom::grow(),
-        RichText::new(label).color(Color32::WHITE),
-        egui::Atom::grow(),
-    ))
-    .gap(0.0)
-    .fill(ACCENT)
-    .stroke(Stroke::NONE)
-    .min_size(vec2(64.0, HEIGHT))
-}
-
 pub(crate) fn section_frame() -> egui::Frame {
     egui::Frame::new()
         .fill(SURFACE)
@@ -860,9 +841,7 @@ pub fn back_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
         vec2(text.size().x + 48.0, HEIGHT),
         egui::Button::new("").frame(false),
     );
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label)
-    });
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label));
     let center = response.rect.left_center() + vec2(18.0, 0.0);
     let color = ui.style().interact(&response).fg_stroke.color;
     ui.painter().add(egui::Shape::line(
@@ -897,8 +876,7 @@ pub fn paint_close(painter: &egui::Painter, rect: egui::Rect, color: Color32) {
 
 pub(crate) fn edit_button(ui: &mut egui::Ui, hint: &str, size: f32) -> egui::Response {
     let (rect, response) = icon_button_area(ui, size);
-    response
-        .widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), hint));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), hint));
     let center = rect.center();
     let color = if response.hovered() { TEXT } else { MUTED };
     let stroke = Stroke::new(theme::ICON_STROKE, color);
@@ -984,8 +962,7 @@ pub fn close_button(ui: &mut egui::Ui, hint: &str, size: f32) -> egui::Response 
 
 pub(crate) fn audio_output_button(ui: &mut egui::Ui, hint: &str, size: f32) -> egui::Response {
     let (rect, response) = icon_button_area(ui, size);
-    response
-        .widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), hint));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), hint));
     let color = if !ui.is_enabled() {
         theme::DISABLED
     } else if response.hovered() {
@@ -1148,9 +1125,8 @@ pub fn screen_add(ui: &mut egui::Ui, enabled: bool) -> egui::Response {
             .line_segment([center - vec2(4.5, 0.0), center + vec2(4.5, 0.0)], stroke);
         ui.painter()
             .line_segment([center - vec2(0.0, 4.5), center + vec2(0.0, 4.5)], stroke);
-        response.widget_info(|| {
-            egui::WidgetInfo::labeled(egui::Role::Button, enabled, "添加虚拟屏")
-        });
+        response
+            .widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, "添加虚拟屏"));
         response
     })
     .inner

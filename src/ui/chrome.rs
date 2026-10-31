@@ -332,9 +332,6 @@ pub(crate) fn handle_title_drag(window: &Window, response: &egui::Response) -> b
     }
 }
 
-pub(crate) fn window_buttons(ui: &mut egui::Ui, window: &Window) -> bool {
-    window_buttons_impl(ui, window, true)
-}
 fn window_buttons_impl(ui: &mut egui::Ui, window: &Window, tooltips: bool) -> bool {
     let expanded = window.is_maximized() || window.fullscreen().is_some();
     let minimize = title_icon_button(

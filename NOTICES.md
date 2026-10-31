@@ -173,7 +173,6 @@ obtained from the currently analyzed UU V4.7.3 SDK distributed
 with 4.41.2.2602 (VA 180FA0D70, 18107EEE0 and 181085BE0). Dimensions and selection rules are defined at their call sites. These parameters are not claimed as
 original project material or covered by the goog_cc/NVENC binding licenses.
 
-
 Rust H.264 desktop encoder
 
 The realtime encoder in crates/codec/kernels/h264 shares the existing LGPL-2.1-or-later
@@ -188,7 +187,6 @@ organization are adapted from Cisco OpenH264 source and verified
 against UU's active producer/consumer paths. The original BSD-2-Clause notice is
 retained in LICENSE. This attribution does not add the
 OpenH264 C/C++ library or bindings to the application.
-
 
 AV1 syntax parsing
 
@@ -213,8 +211,7 @@ MIT; its complete license text is retained at the top of that source file.
 The local Rust source and SIMD assembly are used by the AV1 software playback
 backend. No C decoder implementation is compiled into it.
 
-Diagnostic archive dependency license texts
-==========================================
+# Diagnostic archive dependency license texts
 
 zip-MIT.txt
 The MIT License (MIT)
@@ -239,7 +236,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-
 zstd-rs-MIT.txt
 The MIT License (MIT)
 Copyright (c) 2016 Alexandre Bury
@@ -249,7 +245,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
 
 zstd-BSD-3-Clause.txt
 The auto-generated bindings are under the 3-clause BSD license:
@@ -263,16 +258,16 @@ Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
- * Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
+- Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
 
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+- Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
 
- * Neither the name Facebook, nor Meta, nor the names of its contributors may
-   be used to endorse or promote products derived from this software without
-   specific prior written permission.
+- Neither the name Facebook, nor Meta, nor the names of its contributors may
+  be used to endorse or promote products derived from this software without
+  specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED

@@ -1,4 +1,18 @@
+enable_vkms_socket() {
+    command -v systemctl >/dev/null 2>&1 || return 0
+    # 离线安装也建立开机监听；只启用 socket，不主动拉起 root 服务。
+    systemctl --system enable openuuyc-vkms.socket >/dev/null ||
+        printf '%s\n' 'OpenUUYC：无法自动启用 VKMS socket，请检查 systemd 配置。' >&2
+    if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload || true
+        systemctl --system start openuuyc-vkms.socket ||
+            printf '%s\n' 'OpenUUYC：VKMS socket 未能启动，请查看虚拟显示器诊断页。' >&2
+    fi
+    return 0
+}
+
 post_install() {
+    enable_vkms_socket
     cat <<'EOF'
 OpenUUYC 已安装。
 
@@ -29,10 +43,8 @@ XFCE、MATE、Cinnamon 等桌面上它改写 ~/.config/autostart/openuuyc.deskto
 登录态保存在系统密钥环（Secret Service），需要 gnome-keyring 或 KWallet。
 
 被控端给主控添加虚拟显示器，由内建的 openuuyc vkms 子命令以 root 身份去建内核的 VKMS 输出。
-它由套接字按需启动，不会常驻。装完不开启也一切照旧，只是诊断页里那一行会显示「服务未启用」。
-用它开启：
-
-    sudo systemctl enable --now openuuyc-vkms.socket
+安装和升级会自动启用 VKMS 套接字，无需手动启动服务。
+特权进程由首次连接按需启动，空闲后退出；自动启用不代表已经创建虚拟屏。
 
 还需要 Linux 6.19 或更新的内核带 CONFIG_DRM_VKMS，而且当前合成器能把新输出接进
 桌面布局（目前只有 niri）；条件不满足时诊断页里会写明是哪一条不满足。
@@ -44,6 +56,13 @@ post_upgrade() {
 }
 
 pre_remove() {
+    if command -v systemctl >/dev/null 2>&1; then
+        # 先停止监听和特权进程，避免删除程序后仍可激活或残留虚拟输出。
+        if [ -d /run/systemd/system ]; then
+            systemctl --system stop openuuyc-vkms.socket openuuyc-vkms.service || true
+        fi
+        systemctl --system disable openuuyc-vkms.socket >/dev/null 2>&1 || true
+    fi
     cat <<'EOF'
 OpenUUYC 已移除。以下用户数据被保留：
 
@@ -53,4 +72,10 @@ OpenUUYC 已移除。以下用户数据被保留：
 
 需要时手动删除；先 `systemctl --user disable openuuyc.service` 再删更干净。
 EOF
+}
+
+post_remove() {
+    if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload || true
+    fi
 }

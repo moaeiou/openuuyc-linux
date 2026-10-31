@@ -16,14 +16,6 @@ fn confirmation_id() -> egui::Id {
     egui::Id::unique("display-topology-confirmation")
 }
 
-pub(in crate::application::viewer) fn owns_input(ctx: &egui::Context) -> bool {
-    ctx.data(|d| {
-        d.get_temp::<Confirmation>(confirmation_id()).is_some()
-            || d.get_temp::<String>(egui::Id::unique("display-topology-local-error"))
-                .is_some()
-    })
-}
-
 pub(in crate::application::viewer) fn request(
     ctx: &egui::Context,
     handle: &StreamControlHandle,
