@@ -62,7 +62,7 @@ impl Instance {
         if directory.exists() && !enabled(&directory)? {
             // 上一次没走到 enable 就死了。这种实例还没有 DRM 设备，撤掉重建最省事，
             // 也不会打扰任何合成器。
-            crate::note("发现未启用的残留实例，重建");
+            super::note("发现未启用的残留实例，重建");
             teardown(&directory)?;
         }
         if !directory.exists() {
@@ -114,7 +114,7 @@ impl Instance {
         let connectors = self.connectors()?;
         for slot in 0..connectors.len() {
             if let Err(error) = set_status(slot, Status::Disconnected) {
-                crate::note(&format!("第 {slot} 路连接器断开失败：{error:#}"));
+                super::note(&format!("第 {slot} 路连接器断开失败：{error:#}"));
             }
         }
         Ok(())

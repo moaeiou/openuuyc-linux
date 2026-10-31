@@ -117,7 +117,7 @@ cargo build --release
 
 ## 被控端虚拟显示器（可选）
 
-主控可以要求被控端凭空多出一块显示器。写内核的 configfs 只有 root 能做，所以包里另带一个小程序 `openuuyc-vkms` 和一份套接字激活的系统服务：平时不跑，第一次用到时由套接字拉起。条件：
+主控可以要求被控端凭空多出一块显示器。写内核的 configfs 只有 root 能做，所以主程序内建 `openuuyc vkms` 特权子命令，配合套接字激活的系统服务：平时不跑，第一次用到时由套接字拉起。不再单独编译或安装 `openuuyc-vkms` 可执行文件；GUI 仍以普通用户运行，只有系统服务调用的 `vkms` 子命令以 root 运行。条件：
 
 - **Linux 6.19 或更新的内核**，且编译了 `CONFIG_DRM_VKMS`。更老的内核上 VKMS 没有 configfs 接口（`modinfo -F parm vkms` 里没有 `create_default_dev` 就是），程序不会去碰它，诊断页会写「内核不支持」；
 - systemd（套接字激活）；
@@ -131,11 +131,11 @@ deb 与 AUR 包都会装上它，但**不会替你启用**：不启用一切照�
 sudo systemctl enable --now openuuyc-vkms.socket
 ```
 
-从源码构建或手动安装时，把 `crates/vkms` 编出来的 `openuuyc-vkms` 装到 `/usr/bin/`、两份单元装到 `/usr/lib/systemd/system/`，再执行上面那条命令：
+从源码构建或手动安装时，只需把主程序 `openuuyc` 装到 `/usr/bin/`、两份系统单元装到 `/usr/lib/systemd/system/`，再执行上面那条命令：
 
 ```bash
-(cd crates/vkms && CARGO_TARGET_DIR=../../target cargo build --release --locked)
-sudo install -Dm755 target/release/openuuyc-vkms /usr/bin/openuuyc-vkms
+cargo build --release --locked --bin openuuyc
+sudo install -Dm755 target/release/openuuyc /usr/bin/openuuyc
 sudo install -Dm644 package/linux/openuuyc-vkms.socket \
     package/linux/openuuyc-vkms.service /usr/lib/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now openuuyc-vkms.socket
@@ -173,7 +173,8 @@ sudo pacman -S --needed xdg-desktop-portal-gnome   # KDE 为 xdg-desktop-portal-
 ## 运行前提与开关
 
 - **运行环境**：登录态存在系统密钥环（Secret Service，需要 gnome-keyring、KWallet 等，没有明文回退）。托盘用 StatusNotifierItem，GNOME 需要 AppIndicator 扩展（Ubuntu 默认启用），桌面没有托盘时关闭窗口即退出；面板比程序晚起来时每 2 秒重试，托盘一出现就改回关闭收进托盘。粘贴远端文件要 `fuse3`。Wayland 会话被控也要有 XWayland（显示器列表与输入注入器都先连 X 服务器）；缩放（含分数缩放）的桌面上，门户共享的屏幕按合成器 `xdg-output` 布局里的输出名与所选显示器配对，需要 XWayland 23.1 及以上（输出以连接器命名）且程序能拿到 `WAYLAND_DISPLAY`，配不上时报错，不会采错屏。拖出文件的预览图要 `gio` 与 `rsvg-convert`。
-- **开机自启**：桌面接进 `graphical-session.target` 时是 systemd 用户单元 `app-openuuyc.service`（`journalctl --user -u app-openuuyc` 看日志）。单元名与 `openuuyc.desktop` 对应，门户才认得出这是 OpenUUYC，KDE 记下的屏幕共享授权才能沿用；旧版本启用的 `openuuyc.service` 在程序启动时迁移过去，迁移前的那次登录由它转发。否则写 `~/.config/autostart/openuuyc.desktop`。两者都不处理的合成器（无 uwsm 的 sway、Hyprland 等）请自行启动 `openuuyc gui --background`。再次启动程序会经 `$XDG_RUNTIME_DIR/openuuyc/control.sock` 唤起已运行的控制中心。
+- **开机自启**：桌面接进 `graphical-session.target` 时是 systemd 用户单元 `openuuyc.service`（`journalctl --user -u openuuyc` 看日志）。只维护这一份服务文件；旧版本 `app-openuuyc.service` 的自启状态会在程序启动时迁移到新名称。否则写 `~/.config/autostart/openuuyc.desktop`。两者都不处理的合成器（无 uwsm 的 sway、Hyprland 等）请自行启动 `openuuyc gui --background`。再次启动程序会经 `$XDG_RUNTIME_DIR/openuuyc/control.sock` 唤起已运行的控制中心。
+  - 若 `systemctl --user status openuuyc.service` 显示 `inactive (dead)`，日志却提示“已在运行”，说明这次后台启动没有取得实例锁，不能据此判断已有进程是否正常。先运行 `pgrep -a -x openuuyc`、`lslocks` 查看已有进程和锁持有者，再运行 `openuuyc` 尝试打开已有窗口。若要交给 systemd 管理，先从托盘退出已有实例，再执行 `systemctl --user start openuuyc.service`；需要登录自启时另执行 `systemctl --user enable openuuyc.service`。不要删除运行时目录里的 `.lock` 文件：文件存在不表示锁仍被占用，删除一个被持有的锁文件反而可能让两个实例同时运行。
 - **协助邀请链接**：安装包的 `openuuyc.desktop` 登记了 `x-scheme-handler/uuremote`，没有 Windows 那样的接管开关，可用 `xdg-mime default <程序>.desktop x-scheme-handler/uuremote` 改。便携运行时把链接作为唯一参数传给程序。
 - **被控终端**：默认关闭，在被控设置的访问权限里打开，打开时会确认一次；以 root 运行时不提供，本机也不能新建。shell 跑在 pty 上，断线后保留、重连可接回（重开同一会话即接管，旧连接不再收输出），接回时重画当前屏幕，不带回已滚出屏幕的输出；主控开的会话在退出或切换账号、关闭终端开关、禁止被控或在本机断开连接时结束，两端都没有附着 30 分钟后也会结束。设置页显示运行中的会话数，可一键结束全部。
   - **终端会话页**：侧边栏常驻，列出全部会话，可结束；也能在本机新建会话，或用系统终端接上任一会话（`$TERMINAL` 优先，再找常见的终端模拟器）。命令行是 `openuuyc terminal [编号或名字]`、`--list`、`--new [名字]`，控制中心没在跑时新建和接入会以 `gui --background` 把它拉起来。本机经 `$XDG_RUNTIME_DIR/openuuyc/terminal.sock` 接入，只有同一用户能连。本机与主控同时附着时输入输出同步，终端按两边较小的尺寸显示；关掉本地终端只断开这一端。本机开的会话不会因空闲被结束，shell 退出后从列表消失。
@@ -199,7 +200,6 @@ sudo pacman -S --needed base-devel rust cmake nasm clang pkgconf libva alsa-lib 
 ```bash
 cargo install cargo-deb
 cargo build --release --locked --bin openuuyc
-(cd crates/vkms && CARGO_TARGET_DIR=../../target cargo build --release --locked)
 cargo deb --no-build
 sudo apt install ./target/debian/openuuyc_*.deb
 ```

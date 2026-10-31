@@ -1,7 +1,7 @@
 //! 打开设备以后放掉全部能力。
 //!
 //! 单元只给了 `CAP_SYS_MODULE`（外加放权用的 `CAP_SETPCAP`），而它只在
-//! [`crate::configfs::Instance::open`] 里加载 vkms 的那一下用得到——设备是启动时定一次的，
+//! [`crate::server::configfs::Instance::open`] 里加载 vkms 的那一下用得到——设备是启动时定一次的，
 //! 之后再也不会 modprobe。可这个进程接下来要一直处理 0666 套接字上的不可信输入，
 //! 而沙箱里 `/tmp` 是可写的：万一它被人拿到代码执行，手里还有 `CAP_SYS_MODULE` 的话，
 //! 往 `/tmp` 写一个 `.ko` 再 `finit_module` 就进了内核（没有强制模块签名的发行版，比如
@@ -10,7 +10,7 @@
 //! 放掉以后它还能做的只剩 uid 0 的文件权限：configfs 里 vkms 的目录和属性都归 root、
 //! 权限是属主可写，写它们走的是普通的属主权限检查，不需要任何能力；读 `/sys/class/drm`、
 //! 连系统总线问 logind 也不需要。
-use crate::note;
+use super::note;
 
 /// `_LINUX_CAPABILITY_VERSION_3`：64 位能力集，分两段 32 位。
 const CAPABILITY_VERSION_3: u32 = 0x2008_0522;

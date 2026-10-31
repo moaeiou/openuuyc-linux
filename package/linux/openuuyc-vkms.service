@@ -8,7 +8,7 @@ After=sys-kernel-config.mount
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/openuuyc-vkms
+ExecStart=/usr/bin/openuuyc vkms
 # 它是套接字激活的：不正常退出后，下一次连接会把它拉起来。空闲超时那种正常退出
 # 不会重启，套接字单元还听着，下次连接照样能把它拉起来。
 Restart=on-failure
@@ -48,7 +48,7 @@ MemoryDenyWriteExecute=yes
 NoNewPrivileges=yes
 # CAP_SYS_MODULE 只在启动时加载 vkms 的那一下用；CAP_SETPCAP 是为了用完之后能把
 # bounding 集合也清空。设备一打开（成没成都一样），进程就放掉全部能力再开始接受
-# 连接（crates/vkms/src/bin/openuuyc-vkms/privilege.rs），之后只剩 uid 0 对 configfs
+# 连接（crates/vkms/src/server/privilege.rs），之后只剩 uid 0 对 configfs
 # 的属主写权限。
 CapabilityBoundingSet=CAP_SYS_MODULE CAP_SETPCAP
 SystemCallArchitectures=native

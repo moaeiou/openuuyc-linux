@@ -103,13 +103,10 @@ pub(crate) mod startup {
     use std::path::Path;
     use std::sync::OnceLock;
 
-    /// The `app-<desktop id>` name lets xdg-desktop-portal identify the host
-    /// process as `openuuyc` from its cgroup, the same as a launch from the
-    /// menu, so portal grants such as KDE's screen-sharing approval persist.
-    const UNIT: &str = "app-openuuyc.service";
-    /// The name earlier versions enabled; packages now ship it as a unit that
-    /// only starts [`UNIT`], and [`migrate`] moves an enabled one over.
-    const LEGACY_UNIT: &str = "openuuyc.service";
+    /// 唯一安装和维护的用户服务。
+    const UNIT: &str = "openuuyc.service";
+    /// 只用于迁移旧版本的启用状态，不再安装同名兼容文件。
+    const LEGACY_UNIT: &str = "app-openuuyc.service";
     /// systemd 的用户单元搜索路径里由发行版安装的那几处。包装的单元是权威版本，
     /// 便携运行时系统里没有，才按当前可执行文件另写一份到用户配置目录。
     const PACKAGED_DIRS: [&str; 3] = [
@@ -211,10 +208,8 @@ pub(crate) mod startup {
         Places::current()?.enabled(session_reachable())
     }
 
-    /// Moves login startup enabled by an earlier version from [`LEGACY_UNIT`]
-    /// to [`UNIT`]. A portable run's own legacy unit is a full copy that would
-    /// keep starting the program under the old name; the packaged one only
-    /// forwards, but is retired too.
+    /// 将旧版 app-openuuyc.service 的登录自启迁回唯一的 openuuyc.service。
+    /// 只迁移启用状态，不启动第二个实例，也不停掉当前运行的旧服务。
     pub(crate) fn migrate() {
         let result = (|| -> Result<()> {
             let places = Places::current()?;
@@ -467,7 +462,7 @@ pub(crate) mod startup {
         )
     }
 
-    /// 单元内容。包里的 `package/linux/app-openuuyc.service` 是同一份定义，改这里时
+    /// 单元内容。包里的 `package/linux/openuuyc.service` 是同一份定义，改这里时
     /// 要一起改。
     fn unit_body(image: &str) -> String {
         let specifier = image.replace('%', "%%");
@@ -538,7 +533,7 @@ pub(crate) mod startup {
         /// 包里的单元与程序自己写的必须说同一件事：包装时用前者，便携运行时用后者。
         #[test]
         fn the_shipped_unit_agrees_with_the_generated_one() {
-            let shipped = include_str!("../../../package/linux/app-openuuyc.service");
+            let shipped = include_str!("../../../package/linux/openuuyc.service");
             let generated = unit_body("/usr/bin/openuuyc");
             for line in [
                 "PartOf=graphical-session.target",
@@ -559,17 +554,17 @@ pub(crate) mod startup {
         }
 
         #[test]
-        fn portal_identity_uses_the_desktop_entry_id() {
-            let desktop = include_str!("../../../package/linux/openuuyc.desktop");
-            let compatibility = include_str!("../../../package/linux/openuuyc.service");
-            assert_eq!(UNIT, "app-openuuyc.service");
-            assert!(desktop.contains("Name=OpenUUYC"));
-            assert!(compatibility.contains(
-                "ExecStart=/usr/bin/systemctl --user --no-block start app-openuuyc.service"
-            ));
-            assert!(compatibility.contains(
-                "ExecStop=/usr/bin/systemctl --user --no-block stop app-openuuyc.service"
-            ));
+        fn only_one_service_is_shipped() {
+            let shipped = include_str!("../../../package/linux/openuuyc.service");
+            assert_eq!(UNIT, "openuuyc.service");
+            assert_eq!(LEGACY_UNIT, "app-openuuyc.service");
+            assert!(shipped.contains("ExecStart=/usr/bin/openuuyc gui --background"));
+            assert!(!shipped.contains("systemctl"));
+            assert!(
+                !Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("package/linux/app-openuuyc.service")
+                    .exists()
+            );
         }
 
         #[test]

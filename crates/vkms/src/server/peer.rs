@@ -167,7 +167,7 @@ mod tests {
     /// 真机：把「当前用户有没有一个我们会放行的会话」实际问一遍 logind。
     ///
     /// 只读查询，不动任何东西，但它要这台机器上有 systemd-logind，所以不放进默认
-    /// 测试集：`cargo test --bin openuuyc-vkms -- --ignored --nocapture`
+    /// 测试集：`cargo test --manifest-path crates/vkms/Cargo.toml --lib -- --ignored --nocapture`
     #[test]
     #[ignore = "需要本机的 systemd-logind"]
     fn the_current_user_is_matched_against_a_real_logind() {

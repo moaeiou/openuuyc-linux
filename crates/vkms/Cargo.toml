@@ -3,8 +3,9 @@ name = "openuuyc-vkms"
 version = "0.1.0"
 edition = "2024"
 publish = false
+autobins = false
 license-file = "../../LICENSE"
-description = "OpenUUYC 的虚拟显示器辅助程序：以 root 建 VKMS 输出，客户端部分给主程序用"
+description = "OpenUUYC 内建虚拟显示器模块：客户端与特权服务入口"
 
 # 自成一体：主仓库没有 workspace 表，这里也不参与任何 workspace。
 [workspace]

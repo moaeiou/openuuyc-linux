@@ -45,11 +45,28 @@ mod platform {
         match file.try_lock() {
             Ok(()) => Ok(Some(Instance(file))),
             Err(std::fs::TryLockError::WouldBlock) => match activation {
-                // 运行的实例可能是服务，也可能只是收在托盘里，先把它的窗口叫出来；
-                // 叫不动（旧版本、通道不可用）就保持沉默，别假装又起了一份。
-                Activation::Show if crate::ui::control::activate().is_ok() => Ok(None),
-                Activation::Show | Activation::Quiet => {
-                    eprintln!("OpenUUYC 已在运行，请勿重复启动。");
+                // 运行的实例可能是服务，也可能只是收在托盘里，先把它的窗口叫出来。
+                // 唤醒失败必须保留原因，不能把“没有窗口”当作成功启动。
+                Activation::Show => {
+                    crate::ui::control::activate().with_context(|| {
+                        format!(
+                            "OpenUUYC 实例锁已被占用，但无法唤起已有窗口（锁文件：{}）。\n\
+                             请用 pgrep -a -x openuuyc 和 lslocks 检查运行中的实例；\
+                             不要删除锁文件，这可能导致两个实例同时运行",
+                            path.display()
+                        )
+                    })?;
+                    Ok(None)
+                }
+                Activation::Quiet => {
+                    eprintln!(
+                        "OpenUUYC 已在运行，本次后台启动退出（锁文件：{}）。\n\
+                         已有实例可能由桌面或终端启动，不属于此 systemd 服务；\
+                         请运行 openuuyc 打开窗口，用 pgrep -a -x openuuyc 和 lslocks 检查实例。\n\
+                         如需改由服务管理，请先从托盘退出已有实例，再运行 \
+                         systemctl --user start openuuyc.service。不要删除锁文件。",
+                        path.display()
+                    );
                     Ok(None)
                 }
                 // 链接是用户点出来的，交不出去就得说出来，不能悄悄丢掉。

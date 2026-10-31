@@ -50,9 +50,6 @@ build() {
     cd "$pkgname"
     export CARGO_HOME="$srcdir/cargo"
     cargo build --release --locked --bin openuuyc
-    # 虚拟显示器辅助程序是独立的 crate（自己的 workspace 与 Cargo.lock），产物落到
-    # 同一个 target/，打包时只认一处。
-    ( cd crates/vkms && CARGO_TARGET_DIR="$srcdir/$pkgname/target" cargo build --release --locked )
 }
 
 package() {
@@ -65,14 +62,11 @@ package() {
     install -Dm644 package/linux/60-openuuyc-uinput.rules \
         "$pkgdir/usr/lib/udev/rules.d/60-openuuyc-uinput.rules"
     # 登录自启的被控服务。它跟着 graphical-session.target 走，所以用户要自己
-    # `systemctl --user enable app-openuuyc.service`；装包时不能替用户 enable。
-    install -Dm644 package/linux/app-openuuyc.service \
-        "$pkgdir/usr/lib/systemd/user/app-openuuyc.service"
+    # `systemctl --user enable openuuyc.service`；装包时不能替用户 enable。
     install -Dm644 package/linux/openuuyc.service \
         "$pkgdir/usr/lib/systemd/user/openuuyc.service"
     # 被控端加虚拟屏要写内核 VKMS 的 configfs，只有 root 能写，所以这是另一个按需
     # 启动的系统服务：平时不跑，第一次用到时由套接字拉起（见 openuuyc.install）。
-    install -Dm755 target/release/openuuyc-vkms "$pkgdir/usr/bin/openuuyc-vkms"
     install -Dm644 package/linux/openuuyc-vkms.socket \
         "$pkgdir/usr/lib/systemd/system/openuuyc-vkms.socket"
     install -Dm644 package/linux/openuuyc-vkms.service \

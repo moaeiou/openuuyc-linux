@@ -50,7 +50,6 @@ jobs:
         shell: bash
         run: |
           cargo build --release --locked --bin openuuyc
-          cd crates/vkms && CARGO_TARGET_DIR=../../target cargo build --release --locked
 
       - name: Package to deb
         shell: bash
@@ -61,7 +60,6 @@ jobs:
         run: |
           mkdir -p dist
           install -Dm755 target/release/openuuyc dist/openuuyc
-          install -Dm755 target/release/openuuyc-vkms dist/openuuyc-vkms
           mv target/debian/*.deb dist/
 
       - name: Upload the release files
@@ -100,14 +98,12 @@ jobs:
           stage="openuuyc-${version}-x86_64-linux"
           mkdir -p "$stage"
           # Artifact downloads do not preserve executable permissions.
-          chmod +x dist/openuuyc dist/openuuyc-vkms
+          chmod +x dist/openuuyc
           # Keep the package/ layout in the release archive.
           install -Dm755 dist/openuuyc "$stage/openuuyc"
-          install -Dm755 dist/openuuyc-vkms "$stage/openuuyc-vkms"
           install -Dm755 package/omarchy/install-omarchy.sh "$stage/package/omarchy/install-omarchy.sh"
           for file in package/linux/openuuyc.desktop \
             package/linux/60-openuuyc-uinput.rules \
-            package/linux/app-openuuyc.service \
             package/linux/openuuyc.service \
             package/linux/openuuyc-vkms.socket \
             package/linux/openuuyc-vkms.service \
@@ -116,7 +112,7 @@ jobs:
             install -Dm644 "$file" "$stage/$file"
           done
           tar --zstd -cf "dist/$stage.tar.zst" "$stage"
-          ls -lh "dist/$stage.tar.zst" dist/openuuyc dist/openuuyc-vkms
+          ls -lh "dist/$stage.tar.zst" dist/openuuyc
 
       - name: Build the pacman package
         shell: bash
@@ -163,7 +159,6 @@ jobs:
             dist/*.deb
             dist/openuuyc-*-x86_64-linux.tar.zst
             dist/openuuyc
-            dist/openuuyc-vkms
           body: |
             # OpenUUYC ${{ needs.dpkg.outputs.tag }}
             ## 📝 Release Notes

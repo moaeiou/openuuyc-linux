@@ -10,8 +10,6 @@ use std::time::Duration;
 
 /// 系统级套接字。systemd 的 `openuuyc-vkms.socket` 直接监听这个路径。
 pub const SOCKET: &str = "/run/openuuyc-vkms/control.sock";
-/// 发行版把辅助程序装在这里。
-pub const HELPER: &str = "/usr/bin/openuuyc-vkms";
 /// 套接字单元：有它就说明这套东西装上了，能不能用还要真的连一次（见 [`probe`]）。
 /// 两个路径都认：Debian 系的单元在 /lib/systemd/system，Arch 与新版 Debian 在
 /// /usr/lib/systemd/system。
@@ -39,10 +37,9 @@ impl std::error::Error for Disconnected {}
 
 /// 辅助程序装没装。装没装看文件，能不能用要真的连一次（见 [`probe`]）。
 pub fn installed() -> bool {
-    std::path::Path::new(HELPER).exists()
-        || HELPER_SOCKET_UNITS
-            .iter()
-            .any(|unit| std::path::Path::new(unit).exists())
+    HELPER_SOCKET_UNITS
+        .iter()
+        .any(|unit| std::path::Path::new(unit).exists())
 }
 
 /// 问一次现在的状态。诊断页用这个判断「可用」。

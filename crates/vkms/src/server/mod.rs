@@ -5,13 +5,13 @@
 //! 那是 configfs，内核不会把它的权限放给任何非 root 的进程（不像 `/dev/uinput`
 //! 能靠 udev 规则授权），所以除了一个只做这一件事的小程序，没有别的选择。
 //!
-//! 它刻意不依赖任何应用代码，也不做日志框架：特权进程的每一行都该是能一眼看完的。
+//! 由主程序的 vkms 子命令直接进入，不初始化 GUI 或应用日志。
 mod configfs;
 mod peer;
 mod privilege;
 
+use crate::protocol::{MAX_DIMENSION, MAX_HZ, MIN_DIMENSION, Reply, Request};
 use anyhow::{Context, Result, bail, ensure};
-use openuuyc_vkms::protocol::{MAX_DIMENSION, MAX_HZ, MIN_DIMENSION, Reply, Request};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::Shutdown;
@@ -55,11 +55,15 @@ const IDLE_EXIT: Duration = Duration::from_secs(60);
 
 const EXIT_ERROR: i32 = 1;
 
-fn main() {
-    let socket = match socket_path() {
-        Ok(socket) => socket,
-        Err(error) => fail(error),
-    };
+/// 独立的特权进程入口，由 `openuuyc vkms` 调用；不能在桌面进程里调用。
+pub fn run() {
+    if unsafe { libc::geteuid() } != 0 {
+        fail(anyhow::anyhow!(
+            "VKMS 服务需要 root 权限，请启用 openuuyc-vkms.socket，而不是以 root 启动图形界面"
+        ));
+    }
+    // 命令行由主程序统一解析；这里不能再把 `vkms` 当作旧辅助程序的参数。
+    let socket = DEFAULT_SOCKET.to_owned();
     let listener = match listen(&socket) {
         Ok(listener) => listener,
         Err(error) => fail(error),
@@ -313,10 +317,10 @@ impl Shared {
         }
     }
 
-    fn status(&self, id: u64) -> Result<openuuyc_vkms::protocol::Status> {
+    fn status(&self, id: u64) -> Result<crate::protocol::Status> {
         let instance = self.device.instance()?;
         let taken = lock(&self.taken);
-        Ok(openuuyc_vkms::protocol::Status {
+        Ok(crate::protocol::Status {
             capacity: instance.capacity()? as u32,
             // 本连接租的，和整机现在占着的（不带属主）：诊断页每次都是一条新连接，
             // 只看前者永远显示不出「已在使用」。
@@ -728,14 +732,6 @@ fn wait(listener: &UnixListener, lingering: &[Lingering], timeout: Duration) -> 
 }
 
 /// systemd 套接字激活时监听套接字是 fd 3，不必自己建、也不该自己删。
-fn socket_path() -> Result<String> {
-    let mut args = std::env::args().skip(1);
-    match args.next() {
-        None => Ok(DEFAULT_SOCKET.to_owned()),
-        Some(arg) if arg == "--socket" => args.next().context("--socket 后面要跟路径"),
-        Some(other) => anyhow::bail!("无法识别的参数：{other}"),
-    }
-}
 
 fn listen(path: &str) -> Result<UnixListener> {
     if activated() {
@@ -816,6 +812,24 @@ fn fail(error: anyhow::Error) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn system_service_runs_the_builtin_entry_with_the_existing_sandbox() {
+        let unit = include_str!("../../../../package/linux/openuuyc-vkms.service");
+        assert!(
+            unit.lines()
+                .any(|line| line == "ExecStart=/usr/bin/openuuyc vkms")
+        );
+        for directive in [
+            "ProtectSystem=strict",
+            "NoNewPrivileges=yes",
+            "CapabilityBoundingSet=CAP_SYS_MODULE CAP_SETPCAP",
+            "RestrictAddressFamilies=AF_UNIX",
+        ] {
+            assert!(unit.lines().any(|line| line == directive), "{directive}");
+        }
+        assert_eq!(DEFAULT_SOCKET, crate::client::SOCKET);
+    }
 
     #[test]
     fn refuses_dimensions_the_kernel_or_the_protocol_cannot_carry() {

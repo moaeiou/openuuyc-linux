@@ -1,16 +1,18 @@
-# 旧版本启用的自启单元名，升级后只转发到 app-openuuyc.service（门户靠那个名字认出
-# 应用）。程序启动时会把启用状态挪过去，这份单元只管迁移之前的那次登录。
-# --no-block：不在这个单元的启动任务里等另一个单元起来。
+# 与 src/platform/linux/host_service.rs 的 unit_body 保持一致。
 [Unit]
-Description=OpenUUYC 远程被控（旧名，转发到 app-openuuyc.service）
+Description=OpenUUYC 远程被控
 PartOf=graphical-session.target
-After=graphical-session.target
+After=graphical-session.target xdg-desktop-portal.service
+ConditionFileIsExecutable=/usr/bin/openuuyc
+StartLimitIntervalSec=500
+StartLimitBurst=5
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/systemctl --user --no-block start app-openuuyc.service
-ExecStop=/usr/bin/systemctl --user --no-block stop app-openuuyc.service
+Type=simple
+ExecStart=/usr/bin/openuuyc gui --background
+Restart=on-failure
+RestartSec=5
+KillMode=process
 
 [Install]
 WantedBy=graphical-session.target

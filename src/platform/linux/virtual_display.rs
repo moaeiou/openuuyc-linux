@@ -261,7 +261,7 @@ pub(crate) fn availability() -> Availability {
         return Availability {
             label: "未安装".into(),
             detail: Some(
-                "安装 openuuyc-vkms 后，被控端才能给主控添加虚拟显示器（需要 systemd 与内核的 VKMS 模块）。"
+                "安装 OpenUUYC 配套的 VKMS 系统服务单元后，被控端才能给主控添加虚拟显示器（需要 systemd 与内核的 VKMS 模块）。"
                     .into(),
             ),
         };

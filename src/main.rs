@@ -32,6 +32,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// 虚拟显示器特权服务（由系统级套接字按需启动，不启动图形界面）
+    Vkms,
     #[command(hide = true)]
     DisplayRecovery { token: String },
     /// 列出或接上本机正在运行的被控终端会话
@@ -104,7 +106,6 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-    openuuyc::application::bootstrap::initialize()?;
     let parsed = parse_cli();
 
     let cli = parsed.unwrap_or_else(|error| error.exit());
@@ -116,6 +117,13 @@ fn main() -> Result<()> {
         hardware_decode: None,
         transport: None,
     });
+
+    // 特权入口必须在桌面环境、日志、实例锁和线程初始化之前分流。
+    if matches!(command, Commands::Vkms) {
+        openuuyc_vkms::server::run();
+        return Ok(());
+    }
+    openuuyc::application::bootstrap::initialize()?;
 
     let _instance = if matches!(command, Commands::Gui { .. }) {
         let activation = match (link.as_deref(), &command) {
@@ -151,6 +159,7 @@ fn main() -> Result<()> {
     tracing::info!(target: "openuuyc", version = env!("CARGO_PKG_VERSION"), "application started");
 
     let result = match command {
+        Commands::Vkms => unreachable!("VKMS 入口已在桌面初始化前处理"),
         Commands::DisplayRecovery { token } => openuuyc::application::display_recovery(&token),
         Commands::Terminal { session, list, new } => {
             openuuyc::application::terminal_attach(session.as_deref(), list, new)
