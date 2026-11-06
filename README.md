@@ -2,6 +2,8 @@
 
 ![OpenUUYC](assets/banner.png)
 
+即将停止更新，死因[这里](https://x.com/uu_remote/status/2118539056623870174)
+
 这是用 Rust 编写的 UU 远程第三方 Linux 客户端，支持主控、被控和远程协助。
 
 这是<https://github.com/DoyoDia/openuuyc-linux>的独立分支，只支持Linux。
